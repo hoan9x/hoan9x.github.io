@@ -3,7 +3,7 @@ title: Protect shared memory
 description: The issue of shared data in multithreading
 author: hoan9x
 date: 2024-09-21 11:30:00 +0700
-categories: [Programing language, Cpp, Multi-Threading]
+categories: [Programming language, Cpp, Multi-Threading]
 ---
 
 + The following program has `count` as data shared between 2 threads.<br>

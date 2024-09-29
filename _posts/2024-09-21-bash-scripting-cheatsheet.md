@@ -6,20 +6,22 @@ date: 2024-09-21 11:30:00 +0700
 categories: [Linux, Bash]
 ---
 
-## Reference link
+## **Reference link**
 
 <https://devhints.io/bash>
 
-## Directory
+---
 
-### Current directory
+## **Directory**
+
+### **Current directory**
 
 ```bash
 pwd_dir="$( cd "$( dirname "$0" )" && pwd )"
 echo $pwd_dir
 ```
 
-### Searching
+### **Searching**
 
 ```bash
 # Search directories based on prefix name
@@ -30,7 +32,7 @@ target2=$(find ${search_dir} -maxdepth 1 -type d -name "PREFIX_*" | sed 's!^.*/!
 # Output of target2=('PREFIX_ABC_012' 'PREFIX_ABC_051')
 ```
 
-### Iteration
+### **Iteration**
 
 ```bash
 target=('PREFIX_ABC_012' 'PREFIX_ABC_051')
@@ -39,9 +41,11 @@ for item in $target; do
 done
 ```
 
-## Options
+---
 
-### Check options
+## **Options**
+
+### **Check options**
 
 ```bash
 #!/bin/bash
@@ -80,9 +84,11 @@ else
 fi
 ```
 
-## Waiting script
+---
 
-### Pause until user enters key
+## **Waiting script**
+
+### **Pause until user enters key**
 
 ```bash
 while [ true ] ; do
@@ -99,7 +105,7 @@ fi
 done
 ```
 
-### Sleep
+### **Sleep**
 
 ```bash
 sleep .5 # Waits 0.5 second.
@@ -110,9 +116,11 @@ sleep 5h # Waits 5 hours.
 sleep 5d # Waits 5 days.
 ```
 
-## Logging function
+---
 
-### Print color text
+## **Logging function**
+
+### **Print color text**
 
 ```bash
 #!/bin/bash
@@ -153,9 +161,11 @@ log info    "This is info log"
 log xxx     "This line will not be printed"
 ```
 
-## Filter and edit text
+---
 
-### Filter multiple keywords
+## **Filter and edit text**
+
+### **Filter multiple keywords**
 
 ```bash
 KEY1="key1"; KEY2="key2"; file_path="/tmp/file.txt"
@@ -164,7 +174,7 @@ grep "${KEY1}\|${KEY2}" ${file_path}
 egrep "${KEY1}|${KEY2}" ${file_path}
 ```
 
-### Edit lines in text file
+### **Edit lines in text file**
 
 ```bash
 KEY_1="key1="; KEY_2="key2="; NEW_VALUE_1="test/aaa"; NEW_VALUE_2="test/ccc"
@@ -183,9 +193,11 @@ key2=test/ccc
 Comment
 ```
 
-## File system
+---
 
-### Wildcards
+## **File system**
+
+### **Wildcards**
 
 - `*` matches anything, regardless of length.
 
@@ -199,7 +211,7 @@ For example, the command `ls file?.txt` will print all files like `file1.txt`, `
 
 For example, the command `ls file[0-9].txt` will print all files like `file1.txt`, `file2.txt`, etc. Only specify numbers 0-9.
 
-### Creating files and folders
+### **Creating files and folders**
 
 - Create multiple files and folders using `{}`, it's like a multiplication.
 
@@ -214,7 +226,7 @@ touch file{1..100}.txt
 # Output like "file1.txt  file2.txt  ...  file100.txt"
 ```
 
-### File archiving and compression
+### **File archiving and compression**
 
 - Compress file algorithm gzip: `tar -cvzf archive.tar.gz $file_to_compress`
 - Compress file algorithm bzip2: `tar -cvjf archive.tar.bz2 $file_to_compress`
