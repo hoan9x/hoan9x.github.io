@@ -2,8 +2,8 @@
 title: Tổng quan về AUTOSAR adaptive platform
 description: Tổng quan về thiết kế tổng thể của AP và các khái niệm chính
 author: hoan9x
-date: 2024-10-12 22:00:00 +0700
-categories: [AUTOSAR, Adaptive Platform]
+date: 2024-10-19 22:00:00 +0700
+categories: [Automotive, AUTOSAR AP]
 ---
 
 ## Bối cảnh ra đời một ECU thông minh
@@ -22,6 +22,20 @@ Tương tự với lý do ở trên, yêu cầu về hiệu suất của Process
 
 ## Đặc điểm của AP
 
-- Lập trình bằng C++: Vì đây là ngôn ngữ được lựa chọn để phát triển các thuật toán và phần mềm ứng dụng mới trong các ứng dụng phức tạp, quan trọng về hiệu suất.
-- Kiến ​​trúc hướng dịch vụ (SOA - Service Oriented Architecture): Là một kiến trúc điện toán phân tán (distributed computing), nó hỗ trợ các ứng dụng phức tạp, đồng thời cho phép tính linh hoạt và khả năng mở rộng. Kiến trúc này cũng hưởng lợi từ sự nâng cấp băng thông nhanh và rộng như Ethernet.
-- 
+- Lập trình bằng C++: Vì đây là ngôn ngữ được lựa chọn để phát triển các thuật toán và phần mềm quan trọng về hiệu suất.
+- SOA (Service Oriented Architecture - kiến ​​trúc hướng dịch vụ): Là một kiến trúc điện toán phân tán (distributed computing), nó hỗ trợ các ứng dụng phức tạp, đồng thời cho phép tính linh hoạt và khả năng mở rộng. Kiến trúc này cũng hưởng lợi từ sự nâng cấp băng thông nhanh và rộng như ethernet.
+- Parallel processing (xử lý song song): Vì SOA là kiến trúc tính toán phân tán các dịch vụ, nên AP phải có tính xử lý song song. Xử lý song song còn để khai thác sức mạnh, tăng hiệu suất khi triển khai trên các kiến trúc phần cứng manycore.
+- Leveraging existing standard (tận dụng tiêu chuẩn hiện có): AP sẽ tận dụng lại các tiêu chuẩn sẵn có để đảm bảo khả năng tương thích ngược, cũng như để đẩy nhanh việc phát triển và hưởng lợi những điểm tốt của các tiêu chuẩn này.<br>
+Ví dụ:
+1. AP sử dụng POSIX (là các interface tiêu chuẩn của hệ điều hành, đảm bảo AP có thể chạy trên các hệ điều hành hỗ trợ POSIX).
+2. AP sử dụng ngôn ngữ lập trình theo tiêu chuẩn C++11/14.
+3. AP sử dụng chuẩn giao tiếp mạng IP.
+- Safety and security (an toàn và bảo mật).
+- Planned dynamics: AP được thiết kế có tính động (dynamic) và linh hoạt (flexibility).<br>
+Ví dụ:
+1. Linh động trong việc cập nhật phần mềm: Đây là nhu cầu để AP ra đời và cũng là đặc điểm mà AP phải hướng tới.
+2. Tự động khám phá các dịch vụ: AP là nền tảng có kiến trúc hướng dịch vụ, việc tự động khám phá các dịch vụ rất quan trọng với các hệ thống có nhiều dịch vụ.
+3. Cấu hình linh động: Bạn có thể điều chỉnh các thông số cho AP trong quá trình vận hành.
+- Agile (là một phương pháp phát triển phần mềm linh hoạt): Bạn có thể hiểu Agile là một khuôn khổ quản lý dự án để tiêu chuẩn hóa toàn bộ quy trình phát triển phần mềm. AP hướng đến mục tiêu thích ứng với mọi quy trình phát triển, đặc biệt là Agile vì AP có kiến trúc cơ bản của hệ thống có khả năng mở rộng, cũng như khả năng cập nhật hệ thống một cách linh động.
+
+## AP ra đời có thay thế được
