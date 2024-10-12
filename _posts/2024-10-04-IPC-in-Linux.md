@@ -87,7 +87,8 @@ flowchart TB
   A -..->|"Service response"| E
 ```
 
-- In Linux terminology, handles are called "file descriptors", which are just positive integer numbers. Client handles are called "communication file descriptors" or "data sockets," and "Descriptor" is called the "master socket file descriptor" or "connection socket".
+- In Linux terminology, client handles are called "communication file descriptors" or "data sockets," and "Descriptor" is called the "master socket file descriptor" or "connection socket".
+- All socket descriptors are just integers assigned by the OS, starting from 3 (because 0, 1, and 2 are reserved for `stdin`, `stdout`, and `stderr`).
 
 ### **Unix Domain Socket Introduction**
 
@@ -129,6 +130,26 @@ sequenceDiagram
     Server->>Server: close() [close file descriptor]
     Server->>Server: close() [close master socket file descriptor]
 ```
+
+### **Concept of Multiplexing**
+
+---
+
+Multiplexing is a mechanism, which the server can monitor multiple clients at the same time.
+
+### **FAQ**
+
+---
+
+Question: Does Unix Domain IPC work between a server and a client implemented in different programming languages?
+
+Answer: Yes, Unix Domain Sockets allow IPC between applications written in different programming languages. Since Unix Domain Sockets are an IPC mechanism provided by the Linux kernel for userspace, the applications communicating via this mechanism can be implemented in any language, not just C. 
+
+However, two important aspects must be ensured:
+- Data Format: Both sides must agree on a common data format to handle data serialization and deserialization.
+- Permissions: Unix Domain Sockets create a file in the filesystem for communication. Both the server and client need the correct permissions to access this socket file.
+
+---
 
 [//]: # (----------SCOPE OF DECLARATION OF LIST OF IMAGES USED IN POST----------)
 [img_1]: /assets/img/2024-10-IPC-in-Linux/01_computer_layer_architecture.png "Computer Layer Architecture"
