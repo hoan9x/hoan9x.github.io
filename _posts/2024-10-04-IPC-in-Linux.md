@@ -154,3 +154,6 @@ However, two important aspects must be ensured:
 [//]: # (----------SCOPE OF DECLARATION OF LIST OF IMAGES USED IN POST----------)
 [img_1]: /assets/img/2024-10-IPC-in-Linux/01_computer_layer_architecture.png "Computer Layer Architecture"
 [img_1d]: /assets/img/2024-10-IPC-in-Linux/01d_computer_layer_architecture.png "Computer Layer Architecture"
+
+> This article is not complete yet.
+{: .prompt-warning }

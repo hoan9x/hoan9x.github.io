@@ -26,7 +26,7 @@ Please read the [usage limits](https://docs.github.com/en/pages/getting-started-
 - GitHub account: You can go to [github.com](https://github.com) to **Sign up**, or **Sign in** if you already have an account.
 - Choose a suitable and memorable **username** for your GitHub account: Because your final blog will have a domain in the format `http(s)://<username>.github.io`, so the username is quite important.
 
-![Desktop View][img_1]{: width="600" height="315" .normal }
+![Desktop View][img_1]{: width="800" height="420" .normal }
 > You can change **username** in your account settings.
 {: .prompt-info }
 
@@ -44,19 +44,19 @@ Please read the [usage limits](https://docs.github.com/en/pages/getting-started-
 
 ### **Step 1: Fork your own copy from repository [Chirpy Jekyll theme](https://github.com/cotes2020/jekyll-theme-chirpy).**
 
-![Desktop View][img_2]{: width="600" height="315" .normal }
-![Desktop View][img_3]{: width="600" height="315" .normal }
+![Desktop View][img_2]{: width="800" height="420" .normal }
+![Desktop View][img_3]{: width="800" height="420" .normal }
 
 Enter `Repository name` in the format `<username>.github.io`, replacing `username` with your GitHub username.<br>
 This will be the domain name of the blog when it is hosted.<br>
 After forking the repository, we'll configure a few more steps so that GitHub Pages can build and deploy automatically.
 
-![Desktop View][img_4]{: width="600" height="315" .normal }
+![Desktop View][img_4]{: width="800" height="420" .normal }
 
 Go to the `Settings` of the repository you just forked. Click `Pages`.<br>
 Choose Build and deployment Source is `GitHub Actions`.
 
-![Desktop View][img_5]{: width="600" height="315" .normal }
+![Desktop View][img_5]{: width="800" height="420" .normal }
 
 Go to the `Actions` of your repository. Click `I understand...enable them`.
 
@@ -66,33 +66,33 @@ Go to the `Actions` of your repository. Click `I understand...enable them`.
 
 Copy your URL to clone the repository.
 
-![Desktop View][img_6]{: width="600" height="315" .normal }
+![Desktop View][img_6]{: width="800" height="420" .normal }
 
 Open VSCode and press the shortcut `Ctrl+Shift+P`;<br>
 Then enter command `Dev Containers: Clone Repository in Container Volume...`.
 
-![Desktop View][img_7]{: width="600" height="315" .normal }
+![Desktop View][img_7]{: width="800" height="420" .normal }
 
 Paste your repository URL and wait for the environment setup to complete.
 
-![Desktop View][img_8]{: width="600" height="315" .normal }
+![Desktop View][img_8]{: width="800" height="420" .normal }
 
 > To be able to clone the repository in Container Volume, make sure that Docker engine is running
 {: .prompt-warning }
 
-![Desktop View][img_9]{: width="600" height="315" .normal }
+![Desktop View][img_9]{: width="800" height="420" .normal }
 > _Open Docker Desktop to check if the engine is running._
 
-![Desktop View][img_10]{: width="600" height="315" .normal }
+![Desktop View][img_10]{: width="800" height="420" .normal }
 > _When Docker engine is not running, this error will be returned._
 
 If everything goes well, you will see VSCode is cloning your repository
 
-![Desktop View][img_11]{: width="600" height="315" .normal }
+![Desktop View][img_11]{: width="800" height="420" .normal }
 
 Please wait until the environment is completely setup.
 
-![Desktop View][img_12]{: width="600" height="315" .normal }
+![Desktop View][img_12]{: width="800" height="420" .normal }
 
 ---
 
@@ -100,19 +100,19 @@ Please wait until the environment is completely setup.
 
 Open new terminal.
 
-![Desktop View][img_13]{: width="600" height="315" .normal }
+![Desktop View][img_13]{: width="800" height="420" .normal }
 
 Run `bash ./tools/init.sh` in your terminal.
 
-![Desktop View][img_14]{: width="600" height="315" .normal }
+![Desktop View][img_14]{: width="800" height="420" .normal }
 
 The `init.sh` process will initialize your repository to default.
 
-![Desktop View][img_15]{: width="600" height="315" .normal }
+![Desktop View][img_15]{: width="800" height="420" .normal }
 
 After initialization, push all files to github.
 
-![Desktop View][img_16]{: width="600" height="315" .normal }
+![Desktop View][img_16]{: width="800" height="420" .normal }
 > After entering the command `git push -f origin master`.<br>
 > VSCode may pop up a window asking you to log in to your GitHub account.<br>
 > Please log in to be able to push the source code to your repository.
@@ -120,16 +120,16 @@ After initialization, push all files to github.
 
 After a successful push, you can open your browser to GitHub Actions to see the progress.
 
-![Desktop View][img_17]{: width="600" height="315" .normal }
+![Desktop View][img_17]{: width="800" height="420" .normal }
 
 The successful build and deployment process will look like this:
 
-![Desktop View][img_18]{: width="600" height="315" .normal }
+![Desktop View][img_18]{: width="800" height="420" .normal }
 
 Once you reach this step, your blog is hosted and accessible to everyone around the world.<br>
 You can use any browser to access the domain `<username>.github.io` to see the result.
 
-![Desktop View][img_19]{: width="600" height="315" .normal }
+![Desktop View][img_19]{: width="800" height="420" .normal }
 
 Of course your blog page is blank now, you need to put your information to configure the blog page.
 
@@ -139,7 +139,7 @@ Of course your blog page is blank now, you need to put your information to confi
 
 Open and update the variables in the `_config.yml `file to add personalization to your blog page.
 
-![Desktop View][img_20]{: width="600" height="315" .normal }
+![Desktop View][img_20]{: width="800" height="420" .normal }
 
 Please refer to the official guide to update the `_config.yml ` file [here](https://chirpy.cotes.page/posts/getting-started/#configuration).<br>
 Or you can refer to my `_config.yml` file for this blog [here](https://github.com/hoan9x/hoan9x.github.io/blob/master/_config.yml).
@@ -150,17 +150,17 @@ Or you can refer to my `_config.yml` file for this blog [here](https://github.co
 
 Please refer to the official guide for writing a new post [here](https://chirpy.cotes.page/posts/write-a-new-post).
 
-![Desktop View][img_21]{: width="600" height="315" .normal }
+![Desktop View][img_21]{: width="800" height="420" .normal }
 
 Once you have a new post, open the terminal and run the command `bash ./tools/run.sh`.<br>
 The above command will launch your blog on the address `http://127.0.0.1:4000`.
 
-![Desktop View][img_22]{: width="600" height="315" .normal }
+![Desktop View][img_22]{: width="800" height="420" .normal }
 
 You can use your browser to access `http://127.0.0.1:4000` to review it.
 
-![Desktop View][img_23]{: width="600" height="315" .normal }
-![Desktop View][img_24]{: width="600" height="315" .normal }
+![Desktop View][img_23]{: width="800" height="420" .normal }
+![Desktop View][img_24]{: width="800" height="420" .normal }
 
 ---
 
@@ -168,11 +168,11 @@ You can use your browser to access `http://127.0.0.1:4000` to review it.
 
 Before pushing a post to the repository, use the following command `bash ./tools/test.sh` to test your post.
 
-![Desktop View][img_25]{: width="600" height="315" .normal }
+![Desktop View][img_25]{: width="800" height="420" .normal }
 
 A successful test command will look like this:
 
-![Desktop View][img_26]{: width="600" height="315" .normal }
+![Desktop View][img_26]{: width="800" height="420" .normal }
 
 If the test command has any errors, read the error information and correct it.<br>
 To push the post to the GitHub repository, use the following commands:<br>
@@ -183,9 +183,9 @@ To push the post to the GitHub repository, use the following commands:<br>
 
 After a successful push, you can open your browser to see the result.
 
-![Desktop View][img_27]{: width="600" height="315" .normal }
-![Desktop View][img_28]{: width="600" height="315" .normal }
-![Desktop View][img_29]{: width="600" height="315" .normal }
+![Desktop View][img_27]{: width="800" height="420" .normal }
+![Desktop View][img_28]{: width="800" height="420" .normal }
+![Desktop View][img_29]{: width="800" height="420" .normal }
 
 ---
 
@@ -193,20 +193,20 @@ After a successful push, you can open your browser to see the result.
 
 Click on the bottom left corner of VSCode `Dev Container:...` to `Close Remote Connection`.
 
-![Desktop View][img_30]{: width="600" height="315" .normal }
-![Desktop View][img_31]{: width="600" height="315" .normal }
+![Desktop View][img_30]{: width="800" height="420" .normal }
+![Desktop View][img_31]{: width="800" height="420" .normal }
 
 If you want to go back to the remote repository to edit files or write posts, click as shown below:
 
-![Desktop View][img_32]{: width="600" height="315" .normal }
+![Desktop View][img_32]{: width="800" height="420" .normal }
 
 And if you want to delete the local repository you cloned, the docker environment you installed;<br>
 Open Docker Desktop and delete _Containers_, _Images_, _Volumes_, _Builds_ one by one as shown below:
 
-![Desktop View][img_33]{: width="600" height="315" .normal }
-![Desktop View][img_34]{: width="600" height="315" .normal }
-![Desktop View][img_35]{: width="600" height="315" .normal }
-![Desktop View][img_36]{: width="600" height="315" .normal }
+![Desktop View][img_33]{: width="800" height="420" .normal }
+![Desktop View][img_34]{: width="800" height="420" .normal }
+![Desktop View][img_35]{: width="800" height="420" .normal }
+![Desktop View][img_36]{: width="800" height="420" .normal }
 
 The above deletion actions only delete the source code and environment on your local machine. You can start again from [Step 2: Clone and setup docker environment](#step-2-clone-and-setup-docker-environment) to reinstall the local environment. If you want to delete your blog that is hosted on the global network, please delete GitHub Pages according to [this article](https://docs.github.com/en/pages/getting-started-with-github-pages/deleting-a-github-pages-site).
 
