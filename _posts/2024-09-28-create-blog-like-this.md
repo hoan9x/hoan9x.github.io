@@ -190,7 +190,7 @@ Open Docker Desktop and delete _Containers_, _Images_, _Volumes_, _Builds_ one b
 ![Desktop View][img_35]{: width="800" height="420" .normal }
 ![Desktop View][img_36]{: width="800" height="420" .normal }
 
-The above deletion actions only delete the source code and environment on your local machine. You can start again from [Step 2: Clone and setup docker environment](#step-2-clone-and-setup-docker-environment) to reinstall the local environment. If you want to delete your blog that is hosted on the global network, please delete GitHub Pages according to [this article](https://docs.github.com/en/pages/getting-started-with-github-pages/deleting-a-github-pages-site).
+The above deletion actions only delete the source code and environment on your local machine. You can start again from [Step 2: Clone and setup docker environment](#32-step-2-clone-and-setup-docker-environment) to reinstall the local environment. If you want to delete your blog that is hosted on the global network, please delete GitHub Pages according to [this article](https://docs.github.com/en/pages/getting-started-with-github-pages/deleting-a-github-pages-site).
 
 [//]: # (----------SCOPE OF DECLARATION OF LIST OF IMAGES USED IN POST----------)
 [img_1]: /assets/img/2024-09-create-blog-like-this/01_change_username.png "Change username in account settings"
