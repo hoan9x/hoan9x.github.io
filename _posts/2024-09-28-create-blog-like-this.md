@@ -6,9 +6,7 @@ date: 2024-09-28 19:00:00 +0700
 categories: [Personal blog, Chirpy Jekyll theme]
 ---
 
-## **About GitHub Pages**
-
----
+## 1. About GitHub Pages
 
 This blog uses the [GitHub Pages](https://pages.github.com) feature which allows you to host static web pages directly from your GitHub repository. You can find all information about GitHub Pages features [here](https://docs.github.com/en/pages/getting-started-with-github-pages/about-github-pages#about-github-pages).
 
@@ -19,9 +17,7 @@ Please read the [usage limits](https://docs.github.com/en/pages/getting-started-
 > You should find the most suitable way for yourself, and this is the way I find suitable for myself.
 {: .prompt-warning }
 
-## **Preparation**
-
----
+## 2. Preparation
 
 - GitHub account: You can go to [github.com](https://github.com) to **Sign up**, or **Sign in** if you already have an account.
 - Choose a suitable and memorable **username** for your GitHub account: Because your final blog will have a domain in the format `http(s)://<username>.github.io`, so the username is quite important.
@@ -38,11 +34,9 @@ Please read the [usage limits](https://docs.github.com/en/pages/getting-started-
 
 > If you don't know how to install extensions for VSCode, please refer [here](https://code.visualstudio.com/docs/editor/extension-marketplace).
 
-## **Step by step to create a blog like this**
+## 3. Step by step to create a blog like this
 
----
-
-### **Step 1: Fork your own copy from repository [Chirpy Jekyll theme](https://github.com/cotes2020/jekyll-theme-chirpy).**
+### 3.1. Step 1: Fork your own copy from repository [Chirpy Jekyll theme](https://github.com/cotes2020/jekyll-theme-chirpy).
 
 ![Desktop View][img_2]{: width="800" height="420" .normal }
 ![Desktop View][img_3]{: width="800" height="420" .normal }
@@ -60,9 +54,7 @@ Choose Build and deployment Source is `GitHub Actions`.
 
 Go to the `Actions` of your repository. Click `I understand...enable them`.
 
----
-
-### **Step 2: Clone and setup docker environment.**
+### 3.2. Step 2: Clone and setup docker environment.
 
 Copy your URL to clone the repository.
 
@@ -94,9 +86,7 @@ Please wait until the environment is completely setup.
 
 ![Desktop View][img_12]{: width="800" height="420" .normal }
 
----
-
-### **Step 3: Publish your first initialize page.**
+### 3.3. Step 3: Publish your first initialize page.
 
 Open new terminal.
 
@@ -133,9 +123,7 @@ You can use any browser to access the domain `<username>.github.io` to see the r
 
 Of course your blog page is blank now, you need to put your information to configure the blog page.
 
----
-
-### **Step 4: Configure your personal information.**
+### 3.4. Step 4: Configure your personal information.
 
 Open and update the variables in the `_config.yml `file to add personalization to your blog page.
 
@@ -144,9 +132,7 @@ Open and update the variables in the `_config.yml `file to add personalization t
 Please refer to the official guide to update the `_config.yml ` file [here](https://chirpy.cotes.page/posts/getting-started/#configuration).<br>
 Or you can refer to my `_config.yml` file for this blog [here](https://github.com/hoan9x/hoan9x.github.io/blob/master/_config.yml).
 
----
-
-### **Step 5: Write a 'Hello World!' post and review it on the localhost.**
+### 3.5. Step 5: Write a 'Hello World!' post and review it on the localhost.
 
 Please refer to the official guide for writing a new post [here](https://chirpy.cotes.page/posts/write-a-new-post).
 
@@ -162,9 +148,7 @@ You can use your browser to access `http://127.0.0.1:4000` to review it.
 ![Desktop View][img_23]{: width="800" height="420" .normal }
 ![Desktop View][img_24]{: width="800" height="420" .normal }
 
----
-
-### **Step 6: Push 'Hello World!' post to GitHub repository for global access.**
+### 3.6. Step 6: Push 'Hello World!' post to GitHub repository for global access.
 
 Before pushing a post to the repository, use the following command `bash ./tools/test.sh` to test your post.
 
@@ -187,9 +171,7 @@ After a successful push, you can open your browser to see the result.
 ![Desktop View][img_28]{: width="800" height="420" .normal }
 ![Desktop View][img_29]{: width="800" height="420" .normal }
 
----
-
-### **Appendix: How to delete installed Docker environment.**
+### 3.7. Appendix: How to delete installed Docker environment.
 
 Click on the bottom left corner of VSCode `Dev Container:...` to `Close Remote Connection`.
 

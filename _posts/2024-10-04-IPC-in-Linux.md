@@ -7,9 +7,7 @@ categories: [Linux, IPC]
 mermaid: true
 ---
 
-## **What is IPC?**
-
----
+## 1. What is IPC?
 
 IPC (Inter Process Communication) is a mechanism through which two or more processes running on the same machine exchange data with each other.
 Communication between processes running on different machines is not considered IPC.
@@ -18,26 +16,22 @@ Linux OS provides several mechanisms for user-space processes to communicate wit
 IPC techniques map well to other platforms, such as Windows and MacOS, and are conceptually the same.
 
 IPC Techniques:
-1. Unix domain sockets.
-2. Message queues.
-3. Shared memory.
-4. Signals.
-5. Network sockets (Not covered in this article).
-6. Pipes (Not covered in this article).
+- Unix domain sockets.
+- Message queues.
+- Shared memory.
+- Signals.
+- Network sockets (Not covered in this article).
+- Pipes (Not covered in this article).
 
-## **1. Unix domain sockets**
+## 2. Unix domain sockets
 
-### **Sockets Introduction**
-
----
+### 2.1. Sockets introduction
 
 ![light mode only][img_1]{: width="253" height="131" .right .light .shadow }
 ![dark mode only][img_1d]{: width="253" height="131" .right .dark .shadow }
 Linux provides a set of APIs called **System Calls** that applications can invoke to interact with the underlying OS. Socket APIs serve as the interface between applications and the OS. Using these APIs, applications instruct the OS to provide its services.
 
-### **Socket Message Types**
-
----
+### 2.2. Socket message types
 
 Messages (or requests) exchanged between the client and server processes can be categorized into two types:
 1. Connection initiation request (CIR) messages: Used by the client to request the server to establish a connection.
@@ -55,9 +49,7 @@ sequenceDiagram
   Server process-->>Client process: 4. Response
 ```
 
-### **Socket Design**
-
----
+### 2.3. Socket design
 
 State machine of socket-based client-server communication:
 - When the server starts using the `socket()` API, it creates a connection socket (also called the "master socket file descriptor").
@@ -90,9 +82,7 @@ flowchart TB
 - In Linux terminology, client handles are called "communication file descriptors" or "data sockets," and "Descriptor" is called the "master socket file descriptor" or "connection socket".
 - All socket descriptors are just integers assigned by the OS, starting from 3 (because 0, 1, and 2 are reserved for `stdin`, `stdout`, and `stderr`).
 
-### **Unix Domain Socket Introduction**
-
----
+### 2.4. Unix domain socket introduction
 
 Unix Domain Sockets are used for IPC between two or more processes running on the **same** machine.<br>
 Using Unix Domain Sockets, we can set up STREAM or DGRAM based communication:
@@ -131,25 +121,19 @@ sequenceDiagram
     Server->>Server: close() [close master socket file descriptor]
 ```
 
-### **Concept of Multiplexing**
-
----
+### 2.5. Concept of multiplexing
 
 Multiplexing is a mechanism, which the server can monitor multiple clients at the same time.
 
-### **FAQ**
-
----
+### 2.6. FAQ
 
 Question: Does Unix Domain IPC work between a server and a client implemented in different programming languages?
 
-Answer: Yes, Unix Domain Sockets allow IPC between applications written in different programming languages. Since Unix Domain Sockets are an IPC mechanism provided by the Linux kernel for userspace, the applications communicating via this mechanism can be implemented in any language, not just C. 
+Answer: Yes, Unix Domain Sockets allow IPC between applications written in different programming languages. Since Unix Domain Sockets are an IPC mechanism provided by the Linux kernel for user-space, the applications communicating via this mechanism can be implemented in any language, not just C. 
 
 However, two important aspects must be ensured:
 - Data Format: Both sides must agree on a common data format to handle data serialization and deserialization.
 - Permissions: Unix Domain Sockets create a file in the filesystem for communication. Both the server and client need the correct permissions to access this socket file.
-
----
 
 [//]: # (----------SCOPE OF DECLARATION OF LIST OF IMAGES USED IN POST----------)
 [img_1]: /assets/img/2024-10-IPC-in-Linux/01_computer_layer_architecture.png "Computer Layer Architecture"
