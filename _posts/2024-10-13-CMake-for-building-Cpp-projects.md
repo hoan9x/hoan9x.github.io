@@ -35,6 +35,19 @@ CMake automatically generates a `Makefile` that Make can use to compile the proj
 
 ### 2.1. Project layout
 
+```bash
+# tree --dirsfirst project_cpp_simple
+/ project_cpp_simple/ 
+├── include 
+│   └── playlist_manager.h 
+├── src 
+│   └── playlist_manager.cpp 
+├── CMakeLists.txt 
+└── main.cpp
+
+2 directories, 4 files
+```
+
 ## 3. Building a C++ project as a library
 
 ## 4. Building a C++ project that uses third-party libraries

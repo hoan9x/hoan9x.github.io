@@ -218,3 +218,122 @@ touch file{1..100}.txt
 - Compress file algorithm bzip2: `tar -cvjf archive.tar.bz2 $file_to_compress`
 - Decompress file algorithm gzip: `tar -xvzf archive.tar.gz`
 - Decompress file algorithm bzip2: `tar -xvjf archive.tar.bz2`
+
+## 7. Check RAM, CPU, hard drive
+
+### 7.1. Check RAM
+
+The `meminfo` file inside the `/proc` pseudo-filesystem provides a usage report about memory on the system.
+So you can use the `cat /proc/meminfo` command to read RAM/Swap information.
+```bash
+root@924886591cff:/workspaces# cat /proc/meminfo | grep Mem
+MemTotal:        8007712 kB
+MemFree:         5350452 kB
+MemAvailable:    6102604 kB
+root@924886591cff:/workspaces# cat /proc/meminfo | grep Swap
+SwapCached:            0 kB
+SwapTotal:       2097152 kB
+SwapFree:        2097152 kB
+```
+
+Or use the `free` command, the `-h, --human` options will display human readable output.
+```bash
+root@924886591cff:/workspaces# free -h
+               total        used        free      shared  buff/cache   available
+Mem:           7.6Gi       1.5Gi       5.1Gi       3.0Mi       1.0Gi       5.9Gi
+Swap:          2.0Gi          0B       2.0Gi
+```
+
+The `top` command can also display information about RAM/Swap in MiB (megabytes).
+```bash
+top - 15:33:06 up 51 min,  0 users,  load average: 0.24, 0.13, 0.10
+Tasks:  17 total,   1 running,  16 sleeping,   0 stopped,   0 zombie
+%Cpu(s):  3.4 us,  0.7 sy,  0.0 ni, 95.5 id,  0.0 wa,  0.0 hi,  0.4 si,  0.0 st
+MiB Mem :   7820.0 total,   5244.4 free,   1559.1 used,   1016.5 buff/cache
+MiB Swap:   2048.0 total,   2048.0 free,      0.0 used.   5977.4 avail Mem 
+```
+
+> You can use the [online converter](https://www.unitconverters.net/data-storage-converter.html) to quickly convert MB, GB, kB, etc.
+{: .prompt-tip }
+
+### 7.2. Check CPU
+
+Use the command `cat /proc/cpuinfo` to display all CPU information, or use the following script to display only useful information:
+```bash
+#!/bin/bash
+model=$(grep -m 1 'model name' /proc/cpuinfo | cut -d: -f2)
+nb_cpu=$(grep 'physical id' /proc/cpuinfo | sort -u | wc -l)
+nb_cores=$(grep 'cpu cores' /proc/cpuinfo | head -n 1 | cut -d: -f2)
+nb_units=$(grep -c 'processor' /proc/cpuinfo)
+echo "CPU model:${model}"
+echo "${nb_cpu} CPU, ${nb_cores} physical cores per CPU, total ${nb_units} logical CPU units"
+```
+
+And here is an inline `awk` script:
+```bash
+root@924886591cff:/workspaces# cat /proc/cpuinfo | awk -F: '/^physical id/ { nb_cpu=$2>nb_cpu?$2:nb_cpu } \
+  /^cpu cores/ { nb_cores=$2>nb_cores?$2:nb_cores } \
+  /^processor/ { nb_units=$2>nb_units?$2:nb_units } \
+  /^model name/ { model=$2 } \
+  END { nb_cpu++; nb_units++; \
+  print "CPU model:", model; \
+  print nb_cpu, "CPU,", nb_cores, "physical cores per CPU, total", nb_units, "logical CPU units" }'
+CPU model:  Intel(R) Core(TM) i5-8365U CPU @ 1.60GHz
+1 CPU,  4 physical cores per CPU, total 8 logical CPU units
+```
+
+Or use the command `lscpu` to check cpu information like this:
+```bash
+root@924886591cff:/workspaces# lscpu
+Architecture:            x86_64
+  CPU op-mode(s):        32-bit, 64-bit
+  Address sizes:         39 bits physical, 48 bits virtual
+  Byte Order:            Little Endian
+CPU(s):                  8
+  On-line CPU(s) list:   0-7
+Vendor ID:               GenuineIntel
+  Model name:            Intel(R) Core(TM) i5-8365U CPU @ 1.60GHz
+    CPU family:          6
+    Model:               142
+    Thread(s) per core:  2
+    Core(s) per socket:  4
+    Socket(s):           1
+```
+
+### 7.3. Check hard drive
+
+Use the `df -h` command to show information about file system:
+```bash
+# Option -h, --human-readable will print sizes in powers of 1024 (e.g., 1023M)
+root@924886591cff:/workspaces# df -h
+Filesystem      Size  Used Avail Use% Mounted on
+overlay        1007G   14G  943G   2% /
+tmpfs            64M     0   64M   0% /dev
+tmpfs           3.9G     0  3.9G   0% /sys/fs/cgroup
+shm              64M     0   64M   0% /dev/shm
+C:\             238G  144G   95G  61% /workspaces
+/dev/sdd       1007G   14G  943G   2% /vscode
+tmpfs           3.9G     0  3.9G   0% /proc/acpi
+tmpfs           3.9G     0  3.9G   0% /sys/firmware
+# Use additional <PATH/FILE> if you want to know the storage details of path/file.
+root@924886591cff:/workspaces# df -h /workspaces/test.sh 
+Filesystem      Size  Used Avail Use% Mounted on
+C:\             238G  144G   95G  61% /workspaces
+root@924886591cff:/workspaces# df -h /                   
+Filesystem      Size  Used Avail Use% Mounted on
+overlay        1007G   14G  943G   2% /
+```
+
+Use the `du -sh <FILE>` command to show the disk usage, option `-s, --summarize` will display only a total for each argument and option `-h, --human-readable` will print sizes in human readable format.
+```bash
+root@924886591cff:/workspaces# du -sh .           
+12K     .
+# Sort files in increasing capacity
+root@924886591cff:/workspaces# du -sh /bin/* | sort -n
+0       /bin/addr2line
+0       /bin/ar
+460K    /bin/x86_64-linux-gnu-as
+908K    /bin/x86_64-linux-gnu-gcc-11
+912K    /bin/x86_64-linux-gnu-g++-11
+980K    /bin/openssl
+```
