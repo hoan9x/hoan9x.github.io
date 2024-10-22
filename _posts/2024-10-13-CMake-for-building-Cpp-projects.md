@@ -3,7 +3,7 @@ title: CMake for building C++ projects
 description: This article shows how to use CMake to build a C++ project by performing the exercises
 author: hoan9x
 date: 2024-10-13 12:00:00 +0700
-categories: [Cpp, CMake build system]
+categories: [CXX, CMake build system]
 mermaid: true
 ---
 

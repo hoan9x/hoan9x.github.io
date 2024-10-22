@@ -53,7 +53,7 @@ Hệ thống điện trong các mẫu xe hiện đại thường bao gồm rất
 > - Vì một số lý do sau:
 >   - Bổ sung thế mạch: CP được sử dụng cho các nhiệm vụ thời gian thực (hard real-time), có tính an toàn và ổn định cao. Trong khi đó AP được sử dụng cho các chức năng tiên tiến như hệ thống giải trí, tự hành (ứng dụng phức tạp, cần cập nhật linh động).
 >   - Quá trình phát triển: CP/Non-AUTOSAR đã phát triển từ rất lâu và ổn định, có một số chức năng còn là độc quyền, nên không có lý do gì để AP thay thế hoàn toàn các nền tảng khác được.
->   - Chia sẻ tài nguyên phần cứng: CP sử dụng cho các ECU nhúng truyền thống (chỉ cần xử lý dữ liệu cảm biến), AP sử dụng cho các ECU kiến trúc mới mạnh mẽ và nhiều core. Điều này giúp tối ưu chi phí và hiệu suất.
+>   - Chia sẻ tài nguyên phần cứng: CP sử dụng cho các ECU nhúng truyền thống (chỉ cần xử lý dữ liệu cảm biến), AP sử dụng cho các ECU kiến trúc mới mạnh mẽ và nhiều core. Điều này giúp tối giữa ưu chi phí và hiệu suất.
 
 ## 2. Kiến trúc AP
 
@@ -83,6 +83,15 @@ FC tên Communication Management (CM - ara::com) sẽ cung cấp các chức nă
 ### 2.2. Physical view
 
 #### 2.2.1. OS, processes và threads
+
+- Hệ điều hành (OS - Operating System) của AP yêu cầu khả năng xử lý đa tiến trình theo tiêu chuẩn POSIX.
+- Mỗi AA là một tiến trình độc lập, với không gian bộ nhớ và namespace riêng.
+- Một AA có thể chứa nhiều tiến trình, triển khai trên một hoặc nhiều AP instances.
+- FCs cũng có thể được triển khai dưới dạng tiến trình.
+- Tất cả các tiến trình này có thể là một tiến trình đơn luồng hoặc đa luồng.
+- AA chạy trên ARA nên chỉ sử dụng được PSE51 APIs, còn FCs tự do sử dụng mọi interface của OS.
+
+Tóm lại, từ quan điểm của OS, AP và AA chỉ là một tập hợp các tiến trình, mỗi tiến trình chứa một hoặc nhiều luồng, không có sự khác biệt giữa các tiến trình này. Các tiến trình này tương tác với nhau thông qua IPC, nhưng AA tốt nhất là không sử dụng IPC trực tiếp mà chỉ nên giao tiếp thông qua ARA.
 
 #### 2.2.2. Triển khai FCs dựa trên thư viện (library-based) hay dịch vụ (service-based)
 
