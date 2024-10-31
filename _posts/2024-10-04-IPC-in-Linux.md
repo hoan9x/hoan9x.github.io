@@ -29,7 +29,13 @@ IPC Techniques:
 
 ![light mode only][img_1]{: width="253" height="131" .right .light .shadow }
 ![dark mode only][img_1d]{: width="253" height="131" .right .dark .shadow }
-Linux provides a set of APIs called **System Calls** that applications can invoke to interact with the underlying OS. Socket APIs serve as the interface between applications and the OS. Using these APIs, applications instruct the OS to provide its services.
+A socket is an endpoint for communication between two processes. It serves as a programming abstraction that simplifies network programming by treating network connections as file-like objects.
+
+There are two primary types of sockets:
+- Network sockets: These sockets are used for communication over a network, they allow applications to send and receive data across different machines.
+- Unix domain sockets: These sockets are used for communication between processes on the same machine.
+
+In Unix-like systems, sockets are implemented as file descriptors. To interact with sockets, applications use system calls provided by the operating system. These system calls allow applications to create, connect, and communicate over sockets. By using these APIs, applications can send and receive data across networks efficiently.
 
 ### 2.2. Socket message types
 
@@ -97,7 +103,7 @@ Using Unix Domain Sockets, we can set up STREAM or DGRAM based communication:
  | Data exchange         | After connection is established              | Data sent/received without connection |
  | Protocol examples     | TCP (Network), Unix domain STREAM            | UDP (Network), Unix domain DGRAM      |
 
-This is the sequence of API calls for STREAM-based communication Server/Client using Unix Domain Sockets:
+This is the sequence of API calls for STREAM-based communication Server/Client using Unix domain sockets:
 
 ```mermaid
 sequenceDiagram
@@ -123,9 +129,19 @@ sequenceDiagram
 
 ### 2.5. Concept of multiplexing
 
-Multiplexing is a mechanism, which the server can monitor multiple clients at the same time.
+Multiplexing is a technique that allows a server to monitor and handle multiple clients simultaneously. To achieve this, a list of file descriptors is maintained, and functions like `select()`, `pselect()`, or `poll()` are used to efficiently determine which descriptors are ready for communication. These functions wait until at least one descriptor becomes ready, preventing the server from wasting CPU cycles in idle waiting.
 
-### 2.6. FAQ
+#### 2.5.1. `select()` and `pselect()`
+
+```c
+#include <sys/select.h>
+int select(int maxfdp1, fd_set *restrict readfds,
+            fd_set *restrict writefds, fd_set *restrict exceptfds,
+            struct timeval *restrict tvptr);
+// Returns: count of ready descriptors, 0 on timeout, -1 on error
+```
+
+<!-- ### FAQ
 
 Question: Does Unix Domain IPC work between a server and a client implemented in different programming languages?
 
@@ -133,7 +149,12 @@ Answer: Yes, Unix Domain Sockets allow IPC between applications written in diffe
 
 However, two important aspects must be ensured:
 - Data Format: Both sides must agree on a common data format to handle data serialization and deserialization.
-- Permissions: Unix Domain Sockets create a file in the filesystem for communication. Both the server and client need the correct permissions to access this socket file.
+- Permissions: Unix Domain Sockets create a file in the filesystem for communication. Both the server and client need the correct permissions to access this socket file. -->
+
+## 3. References
+
+- [1] W. Richard Stevens, Stephen A. Rago, *Advanced Programming in the UNIX Environment*, 3rd Edition, 2013.
+- [2] Udemy Course. *Linux Inter Process Communication (IPC) from Scratch in C* [Online]. Available: [link](https://www.udemy.com/course/linuxipc/)
 
 [//]: # (----------SCOPE OF DECLARATION OF LIST OF IMAGES USED IN POST----------)
 [img_1]: /assets/img/2024-10-IPC-in-Linux/01_computer_layer_architecture.png "Computer Layer Architecture"
