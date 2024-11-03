@@ -117,6 +117,272 @@ bool list_contains(int value_to_find)
 }
 ```
 
+### 2.2. Cấu trúc mã để bảo vệ dữ liệu được chia sẻ
+{: #refer-22-cau-truc-ma-de-bao-ve-du-lieu-chia-duoc-chia-se }
+
+Để bảo vệ dữ liệu được chia sẻ một cách hiệu quả, cần đảm bảo rằng tất cả các đoạn mã truy cập dữ liệu đều được bảo vệ bởi mutex. Tránh pass by pointer hoặc reference đến dữ liệu được bảo vệ ra khỏi phạm vi khóa.
+
+Ví dụ trường hợp vô tình truyền ra một tham chiếu đến dữ liệu được bảo vệ:
+```cpp
+class some_data
+{
+    int a;
+    std::string b;
+public:
+    void do_something();
+};
+
+class data_wrapper
+{
+private:
+    some_data data;
+    std::mutex m;
+public:
+    template <typename Function>
+    void process_data(Function func)
+    {
+        std::lock_guard<std::mutex> l(m);
+        func(data);
+    }
+};
+
+some_data *unprotected;
+void malicious_function(some_data &protected_data)
+{
+    unprotected = &protected_data;
+}
+data_wrapper x;
+void foo()
+{
+    x.process_data(malicious_function);
+    unprotected->do_something();
+}
+```
+
+- Dòng 9: `class data_wrapper` đang cố gắng bảo vệ `some_data data;`, và class này có interface `process_data()` với parameter là hàm bất kỳ.
+- Dòng 31: Thực hiện gọi `process_data()` của `data_wrapper` và đưa vào hàm `malicious_function()`, và hàm này lại lấy reference đến dữ liệu muốn được bảo vệ trong `data_wrapper`.
+
+Như vậy, việc bảo vệ dữ liệu không đơn giản là chỉ thêm đối tượng `std::lock_guard` vào các interfaces, nếu xuất hiện một pointer hoặc reference, tất cả sự bảo vệ đều là vô ích.
+
+### 2.3. Phát hiện race conditions trong interface
+
+Xem xét các interface của một cấu trúc dữ liệu `stack` sau:
+```cpp
+template <typename T, typename Container = std::deque<T>>
+class stack
+{
+public:
+    explicit stack(const Container &);
+    explicit stack(Container && = Container());
+    template <class Alloc> explicit stack(const Alloc &);
+    template <class Alloc> stack(const Container &, const Alloc &);
+    template <class Alloc> stack(Container &&, const Alloc &);
+    template <class Alloc> stack(stack &&, const Alloc &);
+
+    bool empty() const;
+    size_t size() const;
+    T &top();
+    T const &top() const;
+    void push(T const &);
+    void push(T &&);
+    void pop();
+    void swap(stack &&);
+    template <class... Args> void emplace(Args &&...args);
+};
+```
+
+Để bảo vệ cấu trúc dữ liệu `stack` trên khỏi race condition, bạn phải chỉnh sửa interface `top()` để nó return copy object thay vì reference (để tuân thủ vấn đề đã nói ở [mục 2.2](#refer-22-cau-truc-ma-de-bao-ve-du-lieu-chia-duoc-chia-se)) và bảo vệ dữ liệu nội bộ bằng mutex, ví dụ:
+```cpp
+template <typename T, typename Container = std::deque<T>>
+class stack
+{
+public:
+    ...
+    bool empty() const
+    {
+        std::lock_guard<std::mutex> lock(mtx);
+        return data.is_empty();
+    }
+    size_t size() const
+    {
+        std::lock_guard<std::mutex> lock(mtx);
+        return data.check_size();
+    }
+    T top() const
+    {
+        std::lock_guard<std::mutex> lock(mtx);
+        return data.top_value();
+    }
+    void push(T const &value)
+    {
+        std::lock_guard<std::mutex> lock(mtx);
+        data.add_item(value);
+    }
+    void pop()
+    {
+        std::lock_guard<std::mutex> lock(mtx);
+        data.remove_item();
+    }
+    ...
+private:
+    T data;
+    std::mutex mtx;
+};
+```
+
+Nhưng chỉ với các chỉnh sửa trên, thì interface của `stack` này vẫn có thể gặp phải race condition. Vấn đề ở đây là kết quả trả về của hai hàm `empty()` và `size()` không đáng tin cậy. Mặc dù chúng có thể đúng tại thời điểm gọi hàm, nhưng các thread khác có thể truy cập `stack` để `push()` hoặc `pop()` làm thay đổi thông tin `empty()` và `size()` trước khi thread này sử dụng thông tin trả về từ `empty()` và `size()`.
+
+Ví dụ vấn đề `empty()` và `size()` không đáng tin cậy:
+```cpp
+stack<int> shared_stack;
+if (!shared_stack.empty())
+{
+    const int value = shared_stack.top();
+    shared_stack.pop();
+    do_something(value);
+}
+```
+
+Xét timeline (dòng thời gian) thứ nhất có thể xảy ra với mã nguồn trên:
+
+| Timeline | Thread A                              | Thread B                              |
+| -------- | ------------------------------------- | ------------------------------------- |
+| 1        | if(!shared_stack.empty())             |                                       |
+| 2        |                                       | const int value = shared_stack.top(); |
+| 3        | const int value = shared_stack.top(); |                                       |
+
+> - Ở timeline 1, ta có Thread A sẽ kiểm tra `shared_stack` nếu không `empty()` thì Thread A sẽ lấy giá trị trong stack bằng `top()`.
+> - Nhưng sau khi Thread A đã kiểm tra `empty()`, đến timeline 2, có thể xảy ra trường hợp Thread B đã lấy giá trị trong stack bằng `top()`.
+> - Như vậy, thông tin mà Thread A xác nhận `empty()` ở timeline 1 đã bị sai lệch, và nếu stack đã thật sự `empty()` bởi vì Thread B vừa lấy giá trị cuối cùng, thì việc Thread A lấy stack bằng `top()` ở timeline 3 sẽ có vấn đề.
+
+Xét timeline thứ hai có thể xảy ra:
+
+| Timeline | Thread A                              | Thread B                              |
+| -------- | ------------------------------------- | ------------------------------------- |
+| 1        | if (!shared_stack.empty())            |                                       |
+| 2        |                                       | if (!shared_stack.empty())            |
+| 3        | const int value = shared_stack.top(); |                                       |
+| 4        |                                       | const int value = shared_stack.top(); |
+| 5        | shared_stack.pop();                   |                                       |
+| 6        | do_something(value);                  | shared_stack.pop();                   |
+| 7        |                                       | do_something(value);                  |
+
+> - Ở timeline 1 và 2, hai Thread A và B lần lượt kiểm tra `shared_stack` có bị `empty()` hay không.
+> - Nếu `shared_stack` không bị `empty()`, thì ở timeline 3 và 4, có thể hai thread sẽ lần lượt lấy cùng một giá trị `top()`.
+> - Nhưng đến timeline 5 và 6, Thread A và B lại thực hiện xóa tận hai giá trị bằng `pop()`.
+> - Như vậy, ở trường hợp này có tận hai giá trị trong `shared_stack` bị xóa, trong khi chỉ có một giá trị nhưng lại được xử lý tận hai lần ở timeline 6 và 7 với `do_something(value)`.
+
+- Giải pháp tránh timeline thứ nhất xảy ra: Có thể cho `top()` thực hiện kiểm tra `empty()` nội bộ trước khi trả về dữ liệu, và nếu stack bị rỗng thì có thể ném ngoại lệ, mã ví dụ:
+```cpp
+template <typename T, typename Container = std::deque<T>>
+class stack
+{
+public:
+    ...
+    T top() const
+    {
+        std::lock_guard<std::mutex> lock(mtx);
+        if (data.is_empty()) throw runtime_error("stack is empty");
+        return data.top_value();        
+    }
+    ...
+private:
+    T data;
+    std::mutex mtx;
+};
+```
+Cách này có thể giải quyết vấn đề, nhưng nó sẽ làm cho việc lập trình trở nên cồng kềnh, vì mỗi lần muốn gọi `top()` thì phải bắt ngoại lệ.
+
+- Giải pháp tránh timeline thứ hai xảy ra: Gộp `top()` và `pop()` lại thành một, mã ví dụ:
+```cpp
+template <typename T, typename Container = std::deque<T>>
+class stack
+{
+public:
+    ...
+    T top() const
+    {
+        std::lock_guard<std::mutex> lock(mtx);
+        if (data.is_empty()) throw runtime_error("stack is empty");
+        T retValue = data.top_value();
+        data.remove_item();
+        return retValue;
+    }
+    ...
+private:
+    T data;
+    std::mutex mtx;
+};
+```
+Như vậy, người dùng `class stack` chỉ cần sử dụng mỗi `top()` để lấy giá trị, và nó cũng thực hiện xóa giá trị trong stack rồi, nên không phải xóa giá trị bằng `pop()` sau đó nữa. Tuy nhiên, giải pháp này dễ gây lỗi khi sử dụng `class stack` cho các kiểu dữ liệu phức tạp như `vector`. Ví dụ, nếu dùng `stack<vector<int>>`, việc return copy object của `top()` có thể yêu cầu nhiều bộ nhớ, và nếu không đủ bộ nhớ, một ngoại lệ `std::bad_alloc` sẽ được ném ra. Nếu lỗi này xảy ra sau khi phần tử đã bị xóa ra khỏi stack nhưng chưa trả về thành công, dữ liệu đó sẽ bị mất vĩnh viễn. Để hạn chế lỗi này, thư viện chuẩn C++ mới thiết kế interface `top()` và `pop()` thành hai lệnh riêng biệt như vậy, nó cho phép dữ liệu vẫn giữ trên stack nếu không thể copy object thành công.
+
+Tóm lại, việc thiết kế interface để tránh race condition là khá khó khăn. Nhưng cũng không phải là không thể, sau đây là các giải pháp để khắc phục thay thế:
+- OPTION 1: PASS IN A REFERENCE (truyền tham chiếu).
+Truyền tham chiếu dữ liệu mà bạn muốn nhận giá trị từ `pop()`. Cách này chỉ có nhược điểm là phải khởi tạo instance của dữ liệu trước khi gọi `pop()` (giống như cấp phát bộ nhớ trước rồi mới sử dụng nó để nhận dữ liệu).
+```cpp
+std::vector<int> result;
+some_stack.pop(result);
+```
+- OPTION 2: REQUIRE A NO-THROW COPY CONSTRUCTOR OR MOVE CONSTRUCTOR (cần copy constructor không ném ngoại lệ `std::bad_alloc` hoặc move constructor).
+- OPTION 3: RETURN A POINTER TO THE POPPED ITEM (trả về kiểu con trỏ thay vì copy object).
+Ưu điểm ở đây là các con trỏ có thể được sao chép tự do mà không ném ra ngoại lệ. Nhược điểm là việc trả về con trỏ yêu cầu phải quản lý bộ nhớ, và nếu đối tượng là các kiểu đơn giản như `int`, chi phí quản lý bộ nhớ có thể vượt quá chi phí trả về theo kiểu copy object. Lưu ý, thay vì trả về kiểu raw pointer thì hãy sử dụng smart pointer thay thế như `std::shared_ptr` để tránh rò rỉ bộ nhớ.
+- OPTION 4: PROVIDE BOTH OPTION 1 AND EITHER OPTION 2 OR 3 (kết hợp giữa những giải pháp đã nói bên trên).
+Dùng function overloading (nạp chồng hàm) để thiết kết các interface có thể thỏa mãn hết các giải pháp đã nói bên trên.
+```cpp
+#include <exception>    // for std::exception
+#include <memory>       // for std::shared_ptr
+#include <mutex>
+#include <stack>
+struct empty_stack: std::exception
+{
+    const char *what() const throw();
+};
+template <typename T>
+class threadsafe_stack
+{
+private:
+    std::stack<T> data;
+    mutable std::mutex mtx;
+public:
+    threadsafe_stack() {}
+    threadsafe_stack(const threadsafe_stack &other)
+    {
+        std::lock_guard<std::mutex> lock(other.mtx);
+        data = other.data;
+    }
+    threadsafe_stack &operator=(const threadsafe_stack &) = delete;
+    void push(T new_value)
+    {
+        std::lock_guard<std::mutex> lock(mtx);
+        data.push(std::move(new_value));
+    }
+    std::shared_ptr<T> pop()
+    {
+        std::lock_guard<std::mutex> lock(mtx);
+        if (data.empty())
+            throw empty_stack();
+        std::shared_ptr<T> const res(std::make_shared<T>(data.top()));
+        data.pop();
+        return res;
+    }
+    void pop(T &value)
+    {
+        std::lock_guard<std::mutex> lock(mtx);
+        if (data.empty())
+            throw empty_stack();
+        value = data.top();
+        data.pop();
+    }
+    bool empty() const
+    {
+        std::lock_guard<std::mutex> lock(mtx);
+        return data.empty();
+    }
+};
+```
+
+### 2.4. Vấn đề về deadlock và biện pháp giải quyết
+
 ## 3. Giải pháp thay thế để bảo vệ dữ liệu được chia sẻ
 
 ## 4. Tài liệu tham khảo
