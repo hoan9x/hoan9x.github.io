@@ -12,9 +12,9 @@ mermaid: true
 
 Chương này đề cập tới:
 - Chờ đợi một sự kiện.
-- Chờ đợi sự kiện một lần với futures.
+- Chờ đợi sự kiện one-off với futures.
 - Chờ đợi trong giới hạn thời gian.
-- Đồng bộ các thao tác để đơn giản hóa mã nguồn.
+- Đồng bộ hóa và tối ưu mã nguồn.
 
 ## 1. Chờ đợi một sự kiện
 
@@ -209,7 +209,7 @@ public:
 };
 ```
 
-## 2. Chờ sự kiện one-off với futures
+## 2. Chờ đợi sự kiện one-off với futures
 
 Sự kiện one-off là sự kiện chỉ diễn ra một lần. Thư viện chuẩn C++ mô phỏng sự kiện này bằng một khái niệm gọi là future. Nếu chỉ cần chờ một sự kiện duy nhất, hãy sử dụng future.
 
@@ -641,10 +641,216 @@ std::cout << "do_something() took "
             << " seconds" << std::endl;
 ```
 
-## 4. Tài liệu tham khảo
+Chú ý loại clock mà time point tham chiếu, vì nó sẽ ảnh hưởng đến hành vi của các hàm chờ `wait_until()`. Nguyên lý của hàm chờ `wait_until()` là nó sẽ không kết thúc cho đến khi `xxx_clock::now()` vượt qua giá trị timeout được chỉ định. Và nếu clock bị điều chỉnh trong thời gian chờ, thời gian chờ thực tế sẽ bị thay đổi. Ví dụ đoạn mã dưới đây cho thấy cách condition variable chờ trong giới hạn 500ms:
+```cpp
+#include <condition_variable>
+#include <mutex>
+#include <chrono>
+std::condition_variable cv;
+bool done;
+std::mutex m;
+bool wait_loop()
+{
+    auto const timeout = std::chrono::steady_clock::now() +
+                         std::chrono::milliseconds(500);
+    std::unique_lock<std::mutex> lk(m);
+    while (!done)
+    {
+        if (cv.wait_until(lk, timeout) == std::cv_status::timeout)
+            break;
+    }
+    return done;
+}
+```
+
+### 3.4. Các hàm hỗ trợ timeout
+
+Timeout cơ bản nhất được sử dụng để trì hoãn xử lý của một thread khi không có công việc, nhằm tránh ảnh hưởng đến hiệu suất của các thread khác. Hai hàm thường dùng là:
+- `std::this_thread::sleep_for(duration)`: Tạm dừng thread trong một khoảng thời gian nhất định.
+- `std::this_thread::sleep_until(time_point)`: Tạm dừng thread đến một thời điểm cụ thể.
+
+Timeout còn được áp dụng trong các cơ chế chờ như condition variables, futures, và timed_mutex. Các hàm hỗ trợ timeout cho phép đồng bộ thread một cách hiệu quả hơn, đặc biệt trong các tình huống cần kiểm soát thời gian chờ cụ thể.
+
+## 4. Đồng bộ hóa và tối ưu mã nguồn
+
+### 4.1. Functional Programming với future
+
+Thuật ngữ Functional Programming (FP) đề cập đến một phong cách lập trình trong đó kết quả của hàm chỉ phụ thuộc vào tham số truyền vào và không thay đổi trạng thái bên ngoài (vì tránh dùng shared data). Điều này giúp loại bỏ các vấn đề về race condition, dẫn đến không cần dùng mutex.
+
+Từ C++11, việc viết mã theo phong cách FP sẽ trở nên dễ dàng hơn nhờ lambda function, `std::bind`, hỗ trợ suy diễn kiểu dữ liệu tự động, và cuối cùng là future, nhờ chúng mà ta có thể truyền kết quả giữa các thread mà không cần truy cập trực tiếp vào shared data.
+
+Để minh họa việc sử dụng future theo phong cách FP, chúng ta sẽ xem xét một hàm đang lập trình cho thuật toán quick-sort:
+```cpp
+template <typename T>
+std::list<T> sequential_quick_sort(std::list<T> input)
+{
+    if (input.empty())
+    {
+        return input;
+    }
+    std::list<T> result;
+    result.splice(result.begin(), input, input.begin());
+    T const &pivot = *result.begin();
+    auto divide_point = std::partition(input.begin(), input.end(),
+        [&](T const &t){ return t < pivot; });
+
+    std::list<T> lower_part;
+    lower_part.splice(lower_part.end(), input, input.begin(), divide_point);
+
+    auto new_lower(sequential_quick_sort(std::move(lower_part)));
+    auto new_higher(sequential_quick_sort(std::move(input)));
+
+    result.splice(result.end(), new_higher);
+    result.splice(result.begin(), new_lower);
+    return result;
+}
+```
+Giải thích:
+- Dòng 9: Dùng `splice()` để ghép item.begin() của `input` list vào `result` list (`splice()` sẽ chỉ gán lại các con trỏ của item bên trong list chứ không copy/move item).
+- Dòng 10: Đặt item begin() làm trục (pivot) để thực hiện quick-sort.
+    + Lưu ý 1: Việc lấy pivot đại như vầy có khả năng làm thuật toán quick-sort không tối ưu.
+    + Lưu ý 2: Viết mã theo phong cách FP, bạn sẽ phải copy data khá nhiều, nên hãy cố gắng dùng reference/move nếu được để đỡ chi phí.
+- Dòng 11: Dùng `std::partition` để phân chia item trong list của `input`, item `t` nào có `(t < pivot)==true` thì item đó được đứng trước list.
+- Như vậy ta có thể có các list với các item được phân chia theo trục (pivot), tiếp tục dùng đệ quy cho đến hết. Thuật toán quick-sort trên có thể được mô tả như hình dưới, với giá trị pivot đầu tiên là 5:
+
+![light mode only][img_2]{: width="850" height="440" .light }
+![dark mode only][img_2d]{: width="850" height="440" .dark }
+
+Hàm `sequential_quick_sort()` trên đã lập trình theo phong cách FP, nên ta có thể dễ dàng chuyển nó thành phiên bản chạy parallel với future:
+```cpp
+template <typename T>
+std::list<T> parallel_quick_sort(std::list<T> input)
+{
+    if (input.empty())
+    {
+        return input;
+    }
+    std::list<T> result;
+    result.splice(result.begin(), input, input.begin());
+    T const &pivot = *result.begin();
+    auto divide_point = std::partition(input.begin(), input.end(),
+        [&](T const &t){ return t < pivot; });
+
+    std::list<T> lower_part;
+    lower_part.splice(lower_part.end(), input, input.begin(), divide_point);
+
+    std::future<std::list<T>> new_lower(std::async(&parallel_quick_sort<T>, std::move(lower_part)));
+    auto new_higher(parallel_quick_sort(std::move(input)));
+
+    result.splice(result.end(), new_higher);
+    result.splice(result.begin(), new_lower.get());
+    return result;
+}
+```
+Hàm `parallel_quick_sort()` trên sử dụng `std::async()` để xử lý bất đồng bộ list `lower_part` trên thread riêng, trong khi phần list `new_higher` vẫn được xử lý đệ quy trên thread hiện tại. Mỗi lần đệ quy có thể tạo thêm thread mới, tận dụng khả năng xử lý đồng thời của phần cứng, và `std::async()` có thể tự động giới hạn số lượng thread để tránh quá tải (vì số lượng thread có thể tăng theo cấp số nhân khi quick-sort một list lớn).
+
+Việc triển khai quick-sort parallel bằng `std::async()` như trên vẫn chưa phải là tối ưu, do `std::partition` vẫn là hàm xử lý tuần tự. Để có hiệu suất cao hơn, bạn phải tham khảo các tài liệu học thuật sâu hơn.
+
+Ngoài FP, một phong cách lập trình khác là mô hình CSP (Communicating Sequential Processes) cũng tránh thay đổi shared data, thay vào đó, các thread giao tiếp bằng message passing (truyền tin nhắn). Mô hình này được áp dụng trong [Erlang](https://www.erlang.org/) và [MPI](https://www.mpi-forum.org/), phần tiếp theo sẽ trình bày cách triển khai mô hình này bằng C++.
+
+### 4.2. Đồng bộ hóa với message passing
+
+CSP (Communicating Sequential Processes) là một mô hình lập trình parallel, trong đó các thread hoặc process hoạt động độc lập và giao tiếp với nhau bằng message passing. Trong CSP, mỗi thread có thể được coi như một state machine: khi nhận được một message, nó sẽ cập nhật state của mình và có thể message passing tới các thread khác (việc xử lý này phụ thuộc vào state hiện tại của thread và nội dung message nhận được).
+
+Mặc dù mô hình CSP gốc là không cho phép shared data giữa các thread, nhưng trong C++, các thread có chung một không gian địa chỉ, việc tuân thủ nguyên tắc không shared data đòi hỏi sự kỷ luật từ lập trình viên. Shared data duy nhất nên được chia sẻ giữa các thread là message queues (hàng đợi để truyền tin nhắn), và các hàng đợi này cần được đồng bộ hóa cẩn thận.
+
+Một ứng dụng thực tiễn của CSP trong C++ là Actor Model, trong đó mỗi Actor là một thực thể độc lập (thường chạy trên một thread), xử lý thông điệp tuần tự và giao tiếp qua các message queue. Sau đây sẽ là một ví dụ về chương trình ATM được triển khai theo Actor Model.
+
+Hệ thống ATM có thể được chia thành các thread độc lập như sau:
+- Thread điều khiển phần cứng: Xử lý thẻ, hiển thị, bàn phím, xuất tiền.
+- Thread logic ATM: Quản lý quy trình giao dịch.
+- Thread giao tiếp tới ngân hàng: Gửi và nhận thông tin xác thực tài khoản.
+
+Dưới đây là cách xây dựng thread logic ATM như một state machine:
+
+![light mode only][img_3]{: width="850" height="600" .light }
+![dark mode only][img_3d]{: width="850" height="600" .dark }
+
+Triển khai đơn giản của thread logic ATM, các thread sẽ giao tiếp qua các message sender/receiver:
+```cpp
+struct card_inserted
+{
+    std::string account;
+};
+class atm
+{
+    messaging::receiver incoming;
+    messaging::sender bank;
+    messaging::sender interface_hardware;
+    void (atm::*state)(); // function pointer to method of class atm
+    std::string account;
+    std::string pin;
+    void waiting_for_card()
+    {
+        interface_hardware.send(display_enter_card());
+        incoming.wait().handle<card_inserted>([&](card_inserted const &msg) {
+            account = msg.account;
+            pin = "";
+            interface_hardware.send(display_enter_pin());
+            state = &atm::getting_pin;
+        });
+    }
+    void getting_pin();
+
+public:
+    void run()
+    {
+        state = &atm::waiting_for_card;
+        try
+        {
+            for (;;)
+            {
+                (this->*state)();
+            }
+        }
+        catch (messaging::close_queue const &) {}
+    }
+};
+```
+Con trỏ hàm `state` được trỏ tới hàm `waiting_for_card()`(dòng 28), hàm này hiển thị yêu cầu người dùng nhập thẻ (dòng 15), sau đó chờ thông điệp kiểu `card_inserted` (dòng 16). Khi nhận được thông điệp, tiến hành một số công việc, sau đó chuyển `state` tới `getting_pin()` (dòng 20).
+
+```cpp
+void atm::getting_pin()
+{
+    incoming.wait().handle<digit_pressed>([&](digit_pressed const &msg)
+    {
+            unsigned const pin_length = 4;
+            pin += msg.digit;
+            if (pin.length() == pin_length)
+            {
+                bank.send(verify_pin(account, pin, incoming));
+                state = &atm::verifying_pin;
+            }
+    }).handle<clear_last_pressed>([&](clear_last_pressed const &msg)
+        {
+            if (!pin.empty())
+            {
+                pin.resize(pin.length() - 1);
+            }
+        }).handle<cancel_pressed>([&](cancel_pressed const &msg)
+            {
+                state = &atm::done_processing;
+            });
+}
+```
+Khi `state` là `getting_pin()`, chương trình sẽ chờ ba loại thông điệp:
+- `digit_pressed`: Thêm ký tự vào `pin` mỗi lần nhập cho tới khi đủ ký tự thì chuyển `state` sang `verifying_pin()`.
+- `clear_last_pressed`: Xóa ký tự vừa nhập.
+- `cancel_pressed`: Hủy giao dịch thì chuyển `state` sang `done_processing()`
+
+Ưu điểm của Actor Model (thực tiễn của mô hình CSP):
+- Đơn giản hóa concurrency và tối ưu mã nguồn: Không cần lo về đồng bộ dữ liệu giữa các thread.
+- Tách biệt nhiệm vụ rõ ràng: Mỗi thread chỉ cần xử lý logic của nó.
+- Dễ mở rộng: Dựa vào message sender/receiver, bạn có thể thêm các tính năng hoặc thread xử lý mới mà không ảnh hưởng tới logic hiện tại.
+
+## 5. Tài liệu tham khảo
 
 - [1] Anthony Williams, "4. Synchronizing concurrent operations" in *C++ Concurrency in Action*, 2nd Edition, 2019.
 
 [//]: # (----------SCOPE OF DECLARATION OF LIST OF IMAGES USED IN POST----------)
 [img_1]: /assets/img/2024-11-CXX-concurrency-chap-4/01_concept_of_duration_and_time_point.png "Khái niệm về duration, time point, và epoch"
 [img_1d]: /assets/img/2024-11-CXX-concurrency-chap-4/01d_concept_of_duration_and_time_point.png "Khái niệm về duration, time point, và epoch"
+[img_2]: /assets/img/2024-11-CXX-concurrency-chap-4/02_demo_quick_sort.png "Ví dụ về quick-sort"
+[img_2d]: /assets/img/2024-11-CXX-concurrency-chap-4/02d_demo_quick_sort.png "Ví dụ về quick-sort"
+[img_3]: /assets/img/2024-11-CXX-concurrency-chap-4/03_ATM_simple_state_machine.png "State machine đơn giản của hệ thống ATM"
+[img_3d]: /assets/img/2024-11-CXX-concurrency-chap-4/03d_ATM_simple_state_machine.png "State machine đơn giản của hệ thống ATM"
