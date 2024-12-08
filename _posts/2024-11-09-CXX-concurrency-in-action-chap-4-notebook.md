@@ -843,6 +843,295 @@ Khi `state` là `getting_pin()`, chương trình sẽ chờ ba loại thông đi
 - Tách biệt nhiệm vụ rõ ràng: Mỗi thread chỉ cần xử lý logic của nó.
 - Dễ mở rộng: Dựa vào message sender/receiver, bạn có thể thêm các tính năng hoặc thread xử lý mới mà không ảnh hưởng tới logic hiện tại.
 
+### 4.3. Đồng thời với continuation-style
+
+Future trong namespace `std::experimental::future` được mở rộng tính năng mới, nó cho phép bổ sung thêm các hành động tiếp theo khi kết quả của future sẵn sàng thông qua hàm `then()`, đây được gọi là continuation-style (kiểu tiếp nối).
+```cpp
+std::experimental::future<int> find_the_answer;
+auto fut = find_the_answer();
+auto fut2 = fut.then(find_the_question);
+assert(!fut.valid()); // fut is invalid
+assert(fut2.valid()); // fut2 is valid
+```
+Tương tự như `std::future`, `std::experimental::future` chỉ cho phép lấy giá trị đã lưu một lần, nên `fut` sẽ không còn hợp lệ. Vì khi dùng `fut.then()`, kết quả của `fut` đã được chuyển giao cho `fut2`. Và `find_the_question` trong `then()` là một hàm continuation sẽ được thực thi "trên một thread không xác định" (là thread do thư viện quản lý) khi future ban đầu sẵn sàng.
+
+Hàm continuation nhận future đã sẵn sàng làm tham số duy nhất, cho phép xử lý cả kết quả và exception. Ví dụ `find_the_answer()` trả về `std::experimental::future<int>`, nên hàm continuation `find_the_question` sẽ có tham số duy nhất là `std::experimental::future<int>`.
+```cpp
+std::string find_the_question(std::experimental::future<int> the_answer);
+```
+
+Trong `std::experimental`, không có API tương đương `std::async` mà trả về `std::experimental::future`, nhưng có thể tự viết bằng cách dùng `std::experimental::promise` như sau:
+```cpp
+template<typename Func>
+std::experimental::future<decltype(std::declval<Func>()())> spawn_async(Func&& func)
+// spawn_async() return a future, and result type is the same as the return type of the Func function.
+{
+    std::experimental::promise<decltype(std::declval<Func>()())> p;
+    auto res = p.get_future();
+    std::thread t( [p = std::move(p), f = std::decay_t<Func>(func)]() mutable
+    {
+        try
+        {
+            // Try to execute the f() and sets the value of the promise
+            p.set_value_at_thread_exit(f());
+        }
+        catch (...)
+        {
+            // If an exception is thrown, it's caught and set as the exception of the promise
+            p.set_exception_at_thread_exit(std::current_exception());
+        }
+    });
+    t.detach();
+    return res;
+}
+```
+
+### 4.4. Đồng thời với chuỗi continuations
+
+Khi có một loạt tác vụ tốn thời gian, bạn muốn thực hiện chúng không đồng bộ để giải phóng main thread cho các nhiệm vụ khác. Ví dụ: khi người dùng đăng nhập vào ứng dụng, bạn cần:
+- Gửi thông tin đăng nhập đến backend để xác thực.
+- Khi xác thực xong, yêu cầu backend cung cấp thông tin tài khoản của người dùng.
+- Sau khi nhận được thông tin tài khoản, cập nhật giao diện hiển thị.
+
+Mã xử lý theo cách tuần tự:
+```cpp
+void process_login(std::string const &username, std::string const &password)
+{
+    try
+    {
+        user_id const id = backend.authenticate_user(username, password);
+        user_data const info_to_display = backend.request_current_info(id);
+        update_display(info_to_display);
+    }
+    catch (std::exception &e)
+    {
+        display_error(e);
+    }
+}
+```
+
+Mã xử lý với `std::async`:
+```cpp
+std::future<void> process_login(std::string const &username, std::string const &password)
+{
+    return std::async(std::launch::async, [=](){
+        try
+        {
+            user_id const id = backend.authenticate_user(username, password);
+            user_data const info_to_display = backend.request_current_info(id);
+            update_display(info_to_display);
+        }
+        catch (std::exception& e)
+        {
+            display_error(e);
+        }
+    });
+}
+```
+Cách xử lý với `std::async` vẫn tiêu tốn tài nguyên vì các thread sẽ bị chặn khi chờ các tác vụ hoàn thành.
+
+Mã xử lý với chuỗi continuations:
+```cpp
+std::experimental::future<void> process_login(std::string const &username, std::string const &password)
+{
+    return spawn_async( [=]()
+    {
+        return backend.authenticate_user(username, password);
+    }
+    ).then([](std::experimental::future<user_id> id)
+    {
+        return backend.request_current_info(id.get());
+    }
+    ).then([](std::experimental::future<user_data> info_to_display)
+    {
+        try
+        {
+            update_display(info_to_display.get());
+        }
+        catch (std::exception& e)
+        {
+            display_error(e);
+        }
+    });
+}
+```
+
+Ưu điểm của chuỗi continuations:
+- Quản lý exception: Nếu bất kỳ phần nào trong chuỗi tác vụ phát sinh exception, nó sẽ được truyền tới phần tiếp theo. Ví dụ, khi `id.get()` hoặc `info_to_display.get()` phát sinh lỗi, đoạn mã cuối cùng có thể xử lý toàn bộ bằng `catch`.
+- Future-unwrapping: Nếu một continuation trả về `future<future<T>>`, `then()` tự động "unwrap" giá trị để trả về `future<T>`. Điều này giúp mã ngắn gọn và dễ đọc hơn. Ví dụ: Không có future-unwrapping thì phải gọi `.get()` nhiều lần để truy xuất giá trị `auto result = fut.get().get();`. Còn có future-unwrapping thì chỉ cần gọi một lần `.get()` với chuỗi continuations.
+- Không blocking thread: Các tác vụ được thực hiện không đồng bộ hoàn toàn, backend trả về future thay vì chặn thread khi chờ dữ liệu.
+
+Ngoài ra, có thể sử dụng `std::experimental::shared_future` cho phép shared data cho nhiều hàm continuations cùng tham chiếu.
+```cpp
+auto fut = spawn_async(some_function).share();
+auto fut2 = fut.then([](std::experimental::shared_future<some_data> data)
+                     { do_stuff(data); });
+auto fut3 = fut.then([](std::experimental::shared_future<some_data> data)
+                     { return do_other_stuff(data); });
+```
+`fut` mã ví dụ trên là `shared_future`, cho phép `fut2` và `fut3` chia sẻ trạng thái mà không có race condition.
+
+### 4.5. Chờ nhiều future cùng lúc
+
+Khi cần xử lý một lượng lớn dữ liệu mà các phần tử có thể xử lý độc lập, bạn có thể tận dụng phần cứng bằng cách khởi chạy các tác vụ `std::async` để xử lý từng phần tử và trả về kết quả qua future, ví dụ:
+```cpp
+std::future<FinalResult> process_data(std::vector<MyData> &vec)
+{
+    size_t const chunk_size = whatever;
+    std::vector<std::future<ChunkResult>> results;
+    for (auto begin = vec.begin(), end = vec.end(); begin != end;)
+    {
+        size_t const remaining_size = end-begin;
+        size_t const this_chunk_size = std::min(remaining_size, chunk_size);
+        results.push_back(std::async(process_chunk, begin, begin+this_chunk_size));
+        begin += this_chunk_size;
+    }
+    return std::async([all_results = std::move(results)]()
+    {
+        std::vector<ChunkResult> v;
+        v.reserve(all_results.size());
+        for (auto &f: all_results)
+        {
+            v.push_back(f.get()); // f.get() will block this thread until the data is ready
+        }
+        return gather_results(v);
+    });
+}
+```
+Trong đoạn code trên, mỗi lần đợi kết quả ở dòng 18, thread sẽ được scheduler đánh thức, xử lý kết quả, và lại ngủ để chờ future tiếp theo. Chờ nhiều future theo cách này tốn chi phí do context switching.
+
+Cách tối ưu hơn nếu gặp trường hợp trên là sử dụng `std::experimental::when_all` để gom tất cả future lại và chờ đồng thời, tạo ra một future mới chỉ sẵn sàng khi tất cả các future con đều hoàn thành. Điều này giúp giảm tải hệ thống vì không cần xử lý từng future riêng lẻ, ví dụ:
+```cpp
+std::experimental::future<FinalResult> process_data(std::vector<MyData> &vec)
+{
+    size_t const chunk_size = whatever;
+    std::vector<std::experimental::future<ChunkResult>> results;
+    for (auto begin = vec.begin(), end = vec.end(); begin != end;)
+    {
+        size_t const remaining_size = end-begin;
+        size_t const this_chunk_size = std::min(remaining_size, chunk_size);
+        results.push_back(spawn_async(process_chunk, begin, begin+this_chunk_size));
+        begin += this_chunk_size;
+    }
+    return std::experimental::when_all(results.begin(), results.end()).then( // Use when_all() to wait for all the futures to become ready
+        [](std::experimental::future<std::vector<std::experimental::future<ChunkResult>>> ready_results)
+        {
+            auto all_results = ready_results.get();
+            std::vector<ChunkResult> v;
+            v.reserve(all_results.size());
+            for (auto &f: all_results)
+            {
+                v.push_back(f.get()); // f.get() will no longer block this thread, because the data is ready
+            }
+            return gather_results(v);
+        });
+}
+```
+- Dòng 12: Sử dụng `when_all()` để tạo future tổng hợp, đợi tất cả các future con hoàn thành.
+- Dòng 20: Các future con tại đây không còn block, vì toàn bộ giá trị đã sẵn sàng.
+
+Bên cạnh `when_all()`, còn có `when_any()` để tạo một future sẵn sàng ngay khi một trong các future được cung cấp hoàn thành. Điều này hữu ích trong trường hợp bạn cần phản hồi ngay khi một tác vụ hoàn thành mà không phải đợi tất cả.
+
+### 4.6. Chờ future đầu tiên hoàn thành với when_any
+
+Giả sử bạn có một tập dữ liệu lớn, và bạn phải tìm một giá trị trong đó và nó phải thỏa mãn một tiêu chí nào đó. Bài toán này có thể song song hóa bằng cách:
+- Chia dữ liệu thành các phần nhỏ, mỗi thread xử lý một phần.
+- Khi thread đầu tiên tìm thấy kết quả, nó dừng các thread khác và trả về kết quả.
+
+Nói cách khác, yêu cầu trên muốn bạn xử lý ngay khi có một tác vụ hoàn thành, dù các tác vụ khác có thể chưa kết thúc. `std::experimental::when_any` phù hợp để giải quyết vấn đề này, ví dụ:
+```cpp
+std::experimental::future<FinalResult> find_and_process_value(std::vector<MyData> &data)
+{
+    unsigned const concurrency = std::thread::hardware_concurrency();
+    unsigned const num_tasks = (concurrency > 0) ? concurrency : 2;
+    std::vector<std::experimental::future<MyData *>> results;
+    auto const chunk_size = (data.size() + num_tasks - 1) / num_tasks;
+    auto chunk_begin = data.begin();
+    auto done_flag = std::make_shared<std::atomic<bool>>(false);
+
+    for (unsigned i = 0; i < num_tasks; ++i)
+    {
+        auto chunk_end = (i < (num_tasks - 1)) ? chunk_begin + chunk_size : data.end();
+        results.push_back(spawn_async([=]
+        {
+            for (auto entry = chunk_begin; !*done_flag && (entry != chunk_end); ++entry)
+            {
+                if (matches_find_criteria(*entry))
+                {
+                    *done_flag = true;
+                    return &*entry;
+                }
+            }
+            return (MyData *)nullptr;
+        }));
+        chunk_begin = chunk_end;
+    }
+
+    auto final_result = std::make_shared<std::experimental::promise<FinalResult>>();
+    struct DoneCheck
+    {
+        std::shared_ptr<std::experimental::promise<FinalResult>> final_result;
+
+        DoneCheck(std::shared_ptr<std::experimental::promise<FinalResult>> final_result_)
+            : final_result(std::move(final_result_)) {}
+
+        void operator()(std::experimental::future<std::experimental::when_any_result<
+                            std::vector<std::experimental::future<MyData *>>>>
+                            results_param)
+        {
+            auto results = results_param.get();
+            MyData *const ready_result = results.futures[results.index].get();
+
+            if (ready_result) final_result->set_value(process_found_value(*ready_result));
+            else
+            {
+                results.futures.erase(results.futures.begin() + results.index);
+                if (!results.futures.empty())
+                {
+                    std::experimental::when_any(results.futures.begin(), results.futures.end())
+                        .then(std::move(*this));
+                }
+                else
+                {
+                    final_result->set_exception(
+                        std::make_exception_ptr(std::runtime_error("Not found")));
+                }
+            }
+        }
+    };
+
+    std::experimental::when_any(results.begin(), results.end())
+        .then(DoneCheck(final_result));
+    return final_result->get_future();
+}
+```
+Giải thích:
+- Dòng 10+: Khởi tạo một số `num_tasks` các tác vụ bất đồng bộ, mỗi tác vụ xử lý một đoạn dữ liệu độc lập.
+- Dòng 13~23: Mỗi tác vụ tìm kiếm giá trị thỏa mãn tiêu chí trong phạm vi của nó. Nếu tìm thấy, nó cập nhật `done_flag` và trả về kết quả.
+- Dòng 61+: Gọi `when_any()` để chờ bất kỳ future nào hoàn thành. Khi có một future hoàn thành, `DoneCheck()` được gọi.
+- Dòng 41: Lấy giá trị từ future hoàn thành.
+- Dòng 43: Nếu giá trị phù hợp, xử lý và đặt kết quả cuối cùng.
+- Dòng 46: Nếu không có giá trị, loại bỏ future này khỏi tập hợp.
+- Dòng 50: Gọi lại `when_any()` cho tập hợp còn lại.
+- Dòng 55: Nếu không còn future nào, ném ngoại lệ "Not found".
+- Dòng 63: Trả về future của kết quả cuối cùng.
+
+### 4.7. Latch và barrier
+
+Latch (cái chốt): Là công cụ đồng bộ dùng để chờ một số sự kiện xảy ra. Nó có một bộ đếm, và khi bộ đếm giảm về 0, latch được "mở". Sau khi mở, latch giữ nguyên trạng thái sẵn sàng cho đến khi bị hủy.
+> Ví dụ: Bạn chờ đủ 5 người đến trước khi bắt đầu buổi họp. Khi đủ 5 người (bộ đếm = 0), bạn bắt đầu họp.
+
+Barrier (cái rào chắn): Là công cụ đồng bộ dùng để đảm bảo tất cả các thread đến "điểm hẹn" trước khi cùng tiến hành công việc tiếp theo. Khi tất cả đã đến, barrier được "mở", và barrier có thể được dùng lại cho chu kỳ đồng bộ tiếp theo.
+> Ví dụ: Mọi người đi bộ đường dài, và mỗi người có thể đi nhanh hoặc chậm. Nhưng tại mỗi điểm hẹn, mọi người phải đợi nhau. Sau khi cả nhóm đã đến, tất cả mới cùng nhau tiếp tục sang chặng tiếp theo.
+
+So sánh:
+- Latch:
+    + Đơn giản hơn, chỉ cần chờ đủ điều kiện (bộ đếm về 0).
+    + Thường dùng để khởi động một lần, không tái sử dụng.
+- Barrier:
+    + Đồng bộ phức tạp hơn, yêu cầu tất cả các thread phải đồng bộ trong từng chu kỳ.
+    + Có thể dùng lại trong nhiều giai đoạn hoặc vòng lặp đồng bộ.
+
 ## 5. Tài liệu tham khảo
 
 - [1] Anthony Williams, "4. Synchronizing concurrent operations" in *C++ Concurrency in Action*, 2nd Edition, 2019.
