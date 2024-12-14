@@ -7,9 +7,6 @@ categories: [CXX, Multi-Threading]
 mermaid: true
 ---
 
-> Bài viết này vẫn chưa hoàn thiện.
-{: .prompt-warning }
-
 Chương này đề cập tới:
 - Chờ đợi một sự kiện.
 - Chờ đợi sự kiện one-off với futures.
@@ -1131,6 +1128,151 @@ So sánh:
 - Barrier:
     + Đồng bộ phức tạp hơn, yêu cầu tất cả các thread phải đồng bộ trong từng chu kỳ.
     + Có thể dùng lại trong nhiều giai đoạn hoặc vòng lặp đồng bộ.
+
+### 4.8. Giới thiệu std::experimental::latch
+
+Header `<experimental/latch>` cung cấp `std::experimental::latch`, như đã giới thiệu ở phần trước, latch hoạt động dựa trên bộ đếm, và khi bộ đếm giảm về 0, latch chuyển sang trạng thái "ready". Chức năng chính của `std::experimental::latch`:
+- `count_down()`: Giảm giá trị bộ đếm.
+- `wait()`: Chờ latch ready (bộ đếm = 0).
+- `is_ready()`: Kiểm tra latch đã ready hay chưa.
+- `count_down_and_wait()`: Vừa giảm bộ đếm vừa chờ cho latch ready.
+
+Ví dụ cơ bản:
+```cpp
+void foo()
+{
+    unsigned const thread_count = ...;
+    latch done(thread_count);
+    my_data data[thread_count];
+    std::vector<std::future<void>> threads;
+
+    for (unsigned i = 0; i < thread_count; ++i)
+        threads.push_back(std::async(std::launch::async, [&, i] {
+            data[i] = make_data(i);
+            done.count_down();
+            do_more_stuff();
+        }));
+
+    done.wait();
+    process_data(data, thread_count);
+}
+```
+Giải thích:
+- Dòng 4: Một latch `done` được khởi tạo với giá trị ban đầu của counter (bộ đếm) là `thread_count`.
+- Dòng 9: Tạo thread với `std::async`, chú ý nên **capture by value** với `i`, vì nó là biến đếm vòng lặp.
+- Dòng 11: Mỗi thread, sau khi xử lý xong phần dữ liệu của nó, thì gọi `count_down()` trên latch để giảm giá trị bộ đếm, báo hiệu rằng sự kiện đã hoàn thành.
+- Dòng 15: Thread chính gọi `done.wait()`để chờ tất cả các thread khác hoàn tất `count_down()`.
+
+Những điểm đáng chú ý:
+- Trường hợp không cần latch: Nếu các thread không có công việc bổ sung sau khi xử lý dữ liệu (dòng 12 `do_more_stuff()`), thì bạn không cần latch. Thay vào đó, có thể chỉ cần chờ các `std::future` từ `std::async`.
+- Không tái sử dụng latch: `std::experimental::latch` chỉ phù hợp với các trường hợp đồng bộ một lần duy nhất.
+
+### 4.9. Giới thiệu std::experimental::barrier
+
+Header `<experimental/barrier>` có hai loại barrier:
+- `std::experimental::barrier`: Loại cơ bản, nhẹ nhàng, tối ưu cho các trường hợp đơn giản.
+- `std::experimental::flex_barrier`: Linh hoạt hơn, hỗ trợ thêm tính năng nhưng thêm chi phí xử lý.
+
+Barrier được thiết kế để đồng bộ các thread trong các chu kỳ xử lý dữ liệu. Khi tất cả các thread đã hoàn tất công việc của mình và đến "điểm hẹn", barrier giải phóng tất cả các thread và sau đó tự reset để sử dụng lại cho chu kỳ tiếp theo.
+
+Cách hoạt động:
+- Khi tạo barrier, bạn chỉ định số lượng thread tham gia đồng bộ.
+- Các thread gọi `arrive_and_wait()` để báo rằng chúng đã hoàn thành công việc.
+- Khi thread cuối cùng trong nhóm đến barrier, tất cả thread được giải phóng để tiếp tục xử lý.
+- Nếu một thread muốn rời nhóm, nó gọi `arrive_and_drop()`, và số thread cần đồng bộ ở chu kỳ tiếp theo giảm đi.
+
+Ví dụ cách sử dụng barrier:
+```cpp
+result_chunk process(data_chunk);
+std::vector<data_chunk> divide_into_chunks(data_block data, unsigned num_threads);
+
+void process_data(data_source &source, data_sink &sink)
+{
+    unsigned const concurrency = std::thread::hardware_concurrency();
+    unsigned const num_threads = (concurrency > 0) ? concurrency : 2;
+    std::experimental::barrier sync(num_threads);
+    std::vector<joining_thread> threads(num_threads);
+    std::vector<data_chunk> chunks;
+    result_block result;
+
+    for (unsigned i = 0; i < num_threads; ++i)
+    {
+        threads[i] = joining_thread([&, i]
+            {
+                while (!source.done())
+                {
+                    if (0 == i)
+                    {
+                        data_block current_block = source.get_next_data_block();
+                        chunks = divide_into_chunks(current_block, num_threads);
+                    }
+                    sync.arrive_and_wait();
+                    result.set_chunk(i, num_threads, process(chunks[i]));
+                    sync.arrive_and_wait();
+                    if (0 == i)
+                    {
+                        sink.write_data(std::move(result));
+                    }
+                }
+            });
+    }
+}
+```
+Giải thích:
+- Dòng 8: Một barrier `sync` được khởi tạo với số lượng thread cần đồng bộ `num_threads`.
+- Dòng 19~22: Thread `i = 0` chia dữ liệu thành các phần (chunks) để phân cho các thread khác xử lý.
+- Dòng 24: Tất cả các thread `arrive_and_wait()` chờ thread `i = 0` hoàn thành công việc chia chunks.
+- Dòng 25: Các thread thực hiện `process(chunks[i])` song song và cập nhật result.
+- Dòng 26: Tất cả lại `arrive_and_wait()` đồng bộ lần nữa trước khi thread `i = 0` viết kết quả cuối cùng vào sink.
+- Dòng 17: Vòng lặp tiếp tục cho đến khi `source.done()`.
+
+### 4.10. Giới thiệu std::experimental::flex_barrier
+
+`std::experimental::flex_barrier` mở rộng từ `std::experimental::barrier` với một điểm khác biệt quan trọng: Nó hỗ trợ một completion function (hàm hoàn tất), được chỉ định thông qua constructor. Hàm này sẽ được chạy bởi đúng một thread khi tất cả các thread đã đến barrier. Completion function không chỉ cho phép thực thi một đoạn mã tuần tự, mà còn cho phép thay đổi số lượng thread cần đồng bộ trong chu kỳ kế tiếp.
+> Lưu ý: Cần đảm bảo số lượng thread tham gia ở chu kỳ tiếp theo được quản lý đúng cách, nếu không sẽ dẫn đến lỗi đồng bộ.
+
+Ví dụ sử dụng flex_barrier:
+```cpp
+void process_data(data_source &source, data_sink &sink)
+{
+    unsigned const concurrency = std::thread::hardware_concurrency();
+    unsigned const num_threads = (concurrency > 0) ? concurrency : 2;
+    std::vector<data_chunk> chunks;
+
+    auto split_source = [&] {
+        if (!source.done())
+        {
+            data_block current_block = source.get_next_data_block();
+            chunks = divide_into_chunks(current_block, num_threads);
+        }
+    };
+    split_source();
+    result_block result;
+
+    std::experimental::flex_barrier sync(num_threads, [&] {
+        sink.write_data(std::move(result));
+        split_source();
+        return -1;
+    });
+
+    std::vector<joining_thread> threads(num_threads);
+    for (unsigned i = 0; i < num_threads; ++i)
+    {
+        threads[i] = joining_thread([&, i] {
+            while (!source.done())
+            {
+                result.set_chunk(i, num_threads, process(chunks[i]));
+                sync.arrive_and_wait();
+            }
+        });
+    }
+}
+```
+Giải thích:
+- Dòng 7~14: Lambda `split_source` chia dữ liệu thành các chunks nhỏ và được gọi để thực hiện ban đầu nhằm chuẩn bị data cho for loop.
+- Dòng 17~20: Sử dụng `flex_barrier` và cung cấp completion function (lambda) thực hiện `sink.write_data()`, rồi lại gọi `split_source` chuẩn bị data cho chu kỳ kế tiếp. Completion function có `return -1` nghĩa là giữ nguyên số lượng thread đồng bộ, có thể `return <number>` với number là 0 hoặc số dương để quyết định số thread ở chu kỳ tiếp theo.
+
+Điểm đáng chú ý: Vòng lặp chính (dòng 27~31) chỉ chứa phần xử lý song song, các đoạn mã tuần tự được chuyển vào completion function, giúp giảm phức tạp và chỉ cần một điểm `arrive_and_wait()` dòng 30.
 
 ## 5. Tài liệu tham khảo
 
