@@ -83,9 +83,7 @@ Cách tránh data race, nguyên nhân trực tiếp dẫn tới undefined behavi
 - Mutex (đã giới thiệu ở chương 3): Đồng bộ hóa giữa các thread, giúp giải quyết race condition, bao gồm cả data race.
 - Atomic operations (sẽ giới thiệu ở chương này): Đồng bộ hóa các thao tác đọc/ghi (sửa đổi) trên dữ liệu, giúp tránh undefined behavior, nhưng không ngăn được race condition, vì thứ tự thứ tự sửa đổi (modification orders) vẫn chưa được xác định.
 
-### 1.3. Modification orders (thứ tự sửa đổi)
-
-
+### 1.3. Modification orders
 
 ## 2. Tài liệu tham khảo
 
