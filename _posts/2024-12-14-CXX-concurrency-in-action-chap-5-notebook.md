@@ -76,7 +76,7 @@ Phân biệt race condition và data race:
 - Race condition: Đã được giải thích khá rõ ở chương 3, và race condition có thể dẫn đến lỗi logic hoặc undefined behavior, nhưng không phải lúc nào cũng gây undefined behavior.
 - Data race: Là một trường hợp cụ thể của race condition, xảy ra khi hai thread cùng truy cập một memory location với ít nhất một thread ghi (write), và không có bất kỳ cơ chế đồng bộ hóa nào. Data race luôn dẫn đến undefined behavior, và vì thế nó nguy hiểm hơn so với race condition.
 
-> Ghi chú thú vị: Tác giả Anthony Williams đã gặp trường hợp undefined behavior khiến màn hình của một lập trình viên bốc cháy! Có thể đây chỉ mang đính cảnh báo hài hước, nhưng nó làm nổi bật mức độ nguy hiểm của lỗi này.
+> Ghi chú thú vị: Tác giả Anthony Williams đã gặp trường hợp undefined behavior khiến màn hình của một lập trình viên bốc cháy! Có thể đây chỉ mang tính cảnh báo hài hước, nhưng nó làm nổi bật mức độ nguy hiểm của lỗi này.
 {: .prompt-info }
 
 Cách tránh data race, nguyên nhân trực tiếp dẫn tới undefined behavior:
@@ -85,7 +85,130 @@ Cách tránh data race, nguyên nhân trực tiếp dẫn tới undefined behavi
 
 ### 1.3. Modification orders
 
-## 2. Tài liệu tham khảo
+Mỗi object trong chương trình C++ có một modification order (thứ tự sửa đổi) bao gồm tất cả các thao tác write (ghi) vào object từ tất cả các threads, bắt đầu từ khi object được khởi tạo. Modification order có thể thay đổi giữa các lần chạy, nhưng trong mỗi lần thực thi, tất cả các threads phải đồng ý về thứ tự đó. Ví dụ trong chương trình dưới đây, kết quả của object data có thể thay đổi tùy theo modification order:
+```cpp
+#include <iostream>
+#include <thread>
+#include <mutex>
+#include <chrono>
+using namespace std::chrono_literals;
+int main()
+{
+    uint8_t data{0};
+    std::mutex mtx;
+
+    std::thread th1([&]{
+        std::this_thread::sleep_for(1ms);
+        std::lock_guard<std::mutex> lk(mtx);
+        data = 1;
+    });
+    std::thread th2([&]{
+        std::this_thread::sleep_for(1ms);
+        std::lock_guard<std::mutex> lk(mtx);
+        data = 2;
+    });
+    std::thread th3([&]{
+        std::this_thread::sleep_for(1ms);
+        std::lock_guard<std::mutex> lk(mtx);
+        data = 3;
+    });
+    th1.join();
+    th2.join();
+    th3.join();
+
+    std::cout << "data=" << std::to_string(data) << std::endl;
+}
+```
+Nếu object không phải là loại atomic, chương trình cần phải có cơ chế đồng bộ (như mutex) để các threads thống nhất về modification order của biến. Nếu không, data race sẽ xảy ra và dẫn đến undefined behavior. Nếu sử dụng atomic operations, compiler sẽ đảm bảo việc đồng bộ này.
+
+Lưu ý rằng việc đồng bộ modification order chỉ giúp tránh data race, chứ không giải quyết vấn đề race condition. Trong ví dụ trên, mặc dù object data đã tránh được data race, nhưng modification order vẫn có thể thay đổi giữa các lần chạy, điều này có thể khiến logic của chương trình thay đổi không theo ý muốn.
+
+## 2. Atomic operations và kiểu dữ liệu atomic
+
+Atomic operation (thao tác nguyên tử) là thao tác không thể chia nhỏ, bạn không thể thấy thao tác đó đang được thực hiện dang dở từ bất kỳ thread nào, nghĩa là thao tác đó hoặc đã hoàn thành hoặc chưa hoàn thành. Trong C++, bạn cần sử dụng kiểu dữ liệu atomic để đảm bảo bạn đang sử dụng atomic operations.
+
+### 2.1. Kiểu dữ liệu atomic tiêu chuẩn
+
+Các kiểu dữ liệu atomic tiêu chuẩn được định nghĩa trong thư viện `<atomic>` của C++.
+
+Bảng liệt kê một số kiểu atomic tiêu chuẩn và template `std::atomic<>` thay thế tương ứng:
+
+| Atomic type            | Corresponding specialization      |
+| ---------------------- | --------------------------------- |
+| `std::atomic_bool`     | `std::atomic<bool>`               |
+| `std::atomic_char`     | `std::atomic<char>`               |
+| `std::atomic_schar`    | `std::atomic<signed char>`        |
+| `std::atomic_uchar`    | `std::atomic<unsigned char>`      |
+| `std::atomic_int`      | `std::atomic<int>`                |
+| `std::atomic_uint`     | `std::atomic<unsigned>`           |
+| `std::atomic_short`    | `std::atomic<short>`              |
+| `std::atomic_ushort`   | `std::atomic<unsigned short>`     |
+| `std::atomic_long`     | `std::atomic<long>`               |
+| `std::atomic_ulong`    | `std::atomic<unsigned long>`      |
+| `std::atomic_llong`    | `std::atomic<long long>`          |
+| `std::atomic_ullong`   | `std::atomic<unsigned long long>` |
+| `std::atomic_char16_t` | `std::atomic<char16_t>`           |
+| `std::atomic_char32_t` | `std::atomic<char32_t>`           |
+| `std::atomic_wchar_t`  | `std::atomic<wchar_t>`            |
+
+Tất cả các thao tác `load()` (đọc), `store()` (ghi) trên các kiểu này đều là atomic operations.
+```cpp
+#include <iostream>
+#include <thread>
+#include <atomic>
+#include <chrono>
+using namespace std::chrono_literals;
+int main()
+{
+    std::atomic_uint data{0};
+
+    std::thread th1([&]{
+        std::this_thread::sleep_for(1ms);
+        data.store(1);
+    });
+    std::thread th2([&]{
+        std::this_thread::sleep_for(1ms);
+        data.store(2);
+    });
+    th1.join();
+    th2.join();
+
+    std::cout << "data=" << std::to_string(data.load()) << std::endl;
+}
+```
+
+Thực ra, chúng ta có thể dùng mutex để làm cho các thao tác khác đọc/ghi trông giống như atomic operations:
+```cpp
+template <typename T>
+class FakeAtomic
+{
+public:
+    void store(const T &val)
+    {
+        std::lock_guard<std::mutex> lk(m_mut);
+        m_data = val;
+    }
+    T load()
+    {
+        std::lock_guard<std::mutex> lk(m_mut);
+        return m_data;
+    }
+private:
+    T m_data;
+    std::mutex m_mut;
+};
+```
+Nếu tạo atomic operations sử dụng mutex nội bộ như trên, thì không có lợi ích gì về mặt hiệu suất chương trình, vì mutex thực chất là một cơ chế đồng bộ hóa ở mức cao hơn, không tận dụng được các lệnh atomic phần cứng.
+
+Thật không may, không phải tất cả phần cứng đều hỗ trợ các thao tác atomic ở hardware-level, vì vậy không phải mọi kiểu atomic đều lock-free. Hầu hết các kiểu std::atomic đều có hàm thành viên `is_lock_free()` để kiểm tra kiểu dữ liệu atomic có thực sự lock-free hay không. Nếu `x.is_lock_free()` trả về `true`, phần cứng hiện tại của bạn hỗ trợ atomic type này, ngược lại, bạn nên chuyển qua dùng mutex cho kiểu dữ liệu bạn muốn bảo vệ.
+
+Từ C++17, các kiểu `std::atomic` còn có thêm một biến thành viên static `is_always_lock_free` cho phép lập trình viên kiểm tra kiểu atomic đó có lock-free hay không tại thời điểm biên dịch (compile-time). Lưu ý, hàm thành viên `is_lock_free()` là để kiểm tra tại thời điểm runtime còn biến thành viên static `is_always_lock_free` kiểm tra tại thời điểm compile-time. Nghĩa là dùng `is_always_lock_free` thì compiler có thể tối ưu chương trình, giúp loại bỏ phần code không dùng tới. Ví dụ khi compile chương trình sau, vì `std::atomic<int>::is_always_lock_free` luôn là `true` tại compile-time nên compiler có thể xóa luôn đoạn mã điều kiện để tối ưu:
+```cpp
+if (std::atomic<int>::is_always_lock_free) // Use atomic operations
+else // Use mutex
+```
+
+## 3. Tài liệu tham khảo
 
 - [1] Anthony Williams, "5. The C++ memory model and operations on atomic types" in *C++ Concurrency in Action*, 2nd Edition, 2019.
 

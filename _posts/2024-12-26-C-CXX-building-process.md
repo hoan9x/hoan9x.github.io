@@ -102,6 +102,7 @@ void display(int y, int *yptr)
     printf("yptr pointer points to address %p which holds a value of %d.\n", yptr, *yptr);
 }
 ```
+
 Dùng GCC để biên dịch tệp chương trình `testprog1.c` trên thành object file:
 ```bash
 $ gcc -c testprog1.c
@@ -115,6 +116,7 @@ $ readelf -a testprog1.o
 $ objdump -s testprog1.o
 # The objdump <-s> means display full contents of all sections requested
 ```
+
 Nội dung của object file khi dùng lệnh `readelf`:
 ```bash
 root@988ac2e024bd:/workspaces# readelf -a testprog1.o 
@@ -138,6 +140,7 @@ Section Headers:
        000000000000013a  0000000000000000  AX       0     0     1
 # ...still more...
 ```
+
 Nội dung của object file khi dùng lệnh `objdump`:
 ```bash
 root@988ac2e024bd:/workspaces# objdump -s testprog1.o 
@@ -159,10 +162,36 @@ Contents of section .comment:
 # ...still more...
 ```
 
-## 3. Tài liệu tham khảo
+### 2.1. Relocation records
+
+Mỗi object file chứa các tham chiếu đến mã hoặc dữ liệu bên trong chính nó và có thể tham chiếu đến các mã hoặc dữ liệu trong các object file khác (ví dụ: chương trình trong một tệp object file có thể gọi hàm hoặc tham chiếu đến các biến được định nghĩa ở một object file khác). Vì vậy, location (vị trí hoặc địa chỉ của các hàm và biến) cần được điều chỉnh thông qua quá trình relocation để kết hợp chính xác trong giai đoạn linking.
+
+Tóm lại:
+- Relocation là quá trình chỉnh sửa các địa chỉ tham chiếu (references) trong một object file để trỏ đến vị trí chính xác sau khi tất cả các object file được kết hợp lại.
+- Linking là bước kết hợp nhiều object files để tạo thành một executable file. Trong quá trình này, linker sẽ thực hiện relocation để đảm bảo rằng các địa chỉ được trỏ đến chính xác.
+
+Ví dụ: Object file có `main()` và nó gọi đến các hàm `funct()` và `printf()`, sau khi linking tất cả các object file với nhau, linker sẽ sử dụng relocation records để tìm tất cả các địa chỉ cần điền để tạo executable file.
+
+![light mode only][img_2]{: width="457" height="441" .light }
+![dark mode only][img_2d]{: width="457" height="441" .dark }
+
+### 2.2. Symbol table
+
+Symbol table (bảng ký hiệu) là gì và tại sao cần thiết?
+- Khi assembly code được biên dịch thành machine code, các labels (nhãn) dùng để định danh các hàm, biến, hoặc địa chỉ trong mã nguồn sẽ bị loại bỏ. Tuy nhiên, để hỗ trợ các bước như linking object files hoặc debugging, những thông tin này vẫn cần được lưu giữ ở đâu đó. Đây chính là vai trò của symbol table:
+  + Symbol table là một bảng chứa danh sách các tên (ví dụ: tên hàm, biến) và offset (vị trí) tương ứng của chúng trong các section như `.text` hoặc `.data`.
+  + Ví dụ, nếu chương trình gọi một hàm `funct()`, symbol table sẽ chỉ ra địa chỉ của hàm đó nằm ở đâu trong `.text` section.
+  + Disassembler (trình giải mã ngược) có thể sử dụng symbol table để chuyển đổi ngược từ một object file hoặc executable file thành mã nguồn gần giống ban đầu.
+- Tóm lại: Symbol table giữ vai trò như một "bản đồ" cho các labels và tên trong code, giúp quá trình linking và phân tích ngược mã sau này dễ dàng hơn.
+
+## 3. Linking
+
+## 4. Tài liệu tham khảo
 
 - [1] Article: *COMPILER, ASSEMBLER, LINKER AND LOADER: A BRIEF STORY* [Online]. Available: [link](https://www.tenouk.com/ModuleW.html).
 
 [//]: # (----------SCOPE OF DECLARATION OF LIST OF IMAGES USED IN POST----------)
-[img_1]: /assets/img/2024-12-C-CXX-building-process/01_compile_link_execute_stages_running_program.png "aaa"
-[img_1d]: /assets/img/2024-12-C-CXX-building-process/01d_compile_link_execute_stages_running_program.png "aaa"
+[img_1]: /assets/img/2024-12-C-CXX-building-process/01_compile_link_execute_stages_running_program.png "Các bước xây dựng chương trình"
+[img_1d]: /assets/img/2024-12-C-CXX-building-process/01d_compile_link_execute_stages_running_program.png "Các bước xây dựng chương trình"
+[img_2]: /assets/img/2024-12-C-CXX-building-process/02_relocation_record_and_linking.png "Quá trình linking và relocation record"
+[img_2d]: /assets/img/2024-12-C-CXX-building-process/02d_relocation_record_and_linking.png "Quá trình linking và relocation record"
