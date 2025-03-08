@@ -34,7 +34,7 @@ Trong C++, mọi dữ liệu, từ các biến cơ bản như `int`, `float` đ�
 > Khi nói **mọi dữ liệu đều là objects** chỉ đúng trong ngữ cảnh bộ nhớ của C++. Các kiểu như `int`, `float` trong C++ không hỗ trợ kế thừa hoặc có member functions, khác với cách sử dụng objects trong các ngôn ngữ như Smalltalk hay Ruby, nơi kiểu cơ bản cũng có thể được mở rộng hoặc xử lý như một object class.
 {: .prompt-info }
 
-Đặc điểm của Objects:
+Đặc điểm của objects:
 - Có thể là các kiểu cơ bản như `int` hoặc `float`.
 - Có thể là các instance của class do người dùng định nghĩa.
 - Một số objects (như array, instance của derived class, hoặc instance của class có non-static data members) sẽ chứa sub-objects, trong khi một số khác thì không.
@@ -202,11 +202,139 @@ Nếu tạo atomic operations sử dụng mutex nội bộ như trên, thì khô
 
 Thật không may, không phải tất cả phần cứng đều hỗ trợ các thao tác atomic ở hardware-level, vì vậy không phải mọi kiểu atomic đều lock-free. Hầu hết các kiểu std::atomic đều có hàm thành viên `is_lock_free()` để kiểm tra kiểu dữ liệu atomic có thực sự lock-free hay không. Nếu `x.is_lock_free()` trả về `true`, phần cứng hiện tại của bạn hỗ trợ atomic type này, ngược lại, bạn nên chuyển qua dùng mutex cho kiểu dữ liệu bạn muốn bảo vệ.
 
-Từ C++17, các kiểu `std::atomic` còn có thêm một biến thành viên static `is_always_lock_free` cho phép lập trình viên kiểm tra kiểu atomic đó có lock-free hay không tại thời điểm biên dịch (compile-time). Lưu ý, hàm thành viên `is_lock_free()` là để kiểm tra tại thời điểm runtime còn biến thành viên static `is_always_lock_free` kiểm tra tại thời điểm compile-time. Nghĩa là dùng `is_always_lock_free` thì compiler có thể tối ưu chương trình, giúp loại bỏ phần code không dùng tới. Ví dụ khi compile chương trình sau, vì `std::atomic<int>::is_always_lock_free` luôn là `true` tại compile-time nên compiler có thể xóa luôn đoạn mã điều kiện để tối ưu:
+Từ C++17, các kiểu `std::atomic` còn có thêm một biến thành viên static `is_always_lock_free` cho phép lập trình viên kiểm tra kiểu atomic đó có lock-free hay không tại thời điểm biên dịch (compile-time).
+
+> Lưu ý, hàm thành viên `is_lock_free()` là để kiểm tra tại thời điểm runtime còn biến thành viên static `is_always_lock_free` kiểm tra tại thời điểm compile-time. Nghĩa là dùng `is_always_lock_free` thì compiler có thể tối ưu chương trình, giúp loại bỏ phần code không dùng tới.
+{: .prompt-info }
+
+Ví dụ khi compile chương trình sau, nếu `std::atomic<int>::is_always_lock_free` là `true` tại compile-time thì compiler có thể xóa luôn đoạn mã điều kiện để tối ưu:
 ```cpp
 if (std::atomic<int>::is_always_lock_free) // Use atomic operations
 else // Use mutex
 ```
+
+Ngoài ra, C++11 còn cung cấp các macro [ATOMIC_*_LOCK_FREE](https://en.cppreference.com/w/c/atomic/ATOMIC_LOCK_FREE_consts) giúp xác định trạng thái lock-free của các kiểu atomic. Các macro này có thể trả về:
+- 0: The atomic type is never lock-free => Cần cơ chế đồng bộ hóa khác chẳng hạn như mutex.
+- 1: The atomic type is sometimes lock-free (Nghĩa là không thể xác định trong compile-time) => Giá trị này thường gặp khi không cấu hình biên dịch cho một kiến trúc vi xử lý cụ thể. Hoặc kiến trúc vi xử lý đó không hỗ trợ hoàn toàn các phép toán atomic lock-free, hay chỉ hỗ trợ trong một số tình huống.
+- 2: The atomic type is always lock-free.
+
+`std::atomic_flag` là kiểu atomic duy nhất không có hàm thành viên `is_lock_free()`. Nó là một cờ `Boolean` đơn giản và luôn lock-free. Bạn có thể sử dụng nó để triển khai các kiểu atomic khác. Các đối tượng `std::atomic_flag` được khởi tạo là "clear", và chỉ có thể được truy vấn và thiết lập bằng `test_and_set()` hoặc xóa bằng `clear()`.
+
+Mỗi atomic operation như `store()/load()` có một tham số tuỳ chọn gọi là memory-ordering. Tham số này được sử dụng để chỉ định cách thức sắp xếp bộ nhớ, và nó có thể là một trong các giá trị [`enum std::memory_order`](https://en.cppreference.com/w/cpp/atomic/memory_order).
+
+Các giá trị enum được phép đặt cho memory-ordering phụ thuộc vào loại atomic operation. Nếu không đặt giá trị ordering, mặc định sẽ là `std::memory_order_seq_cst` (đây là kiểu sắp xếp mạnh nhất).
+
+Giá trị enum được phép đặt cho memory-ordering của các atomic operation cơ bản như sau:
+- Store operations: `memory_order_relaxed`, `memory_order_release`, `memory_order_seq_cst`.
+- Load operations: `memory_order_relaxed`, `memory_order_consume`, `memory_order_acquire`, `memory_order_seq_cst`.
+- Read-modify-write operations: `memory_order_relaxed`, `memory_order_consume`, `memory_order_acquire`, `memory_order_release`, `memory_order_acq_rel`, `memory_order_seq_cst`.
+
+### 2.2. Thao tác với `std::atomic_flag`
+
+`std::atomic_flag` là kiểu dữ liệu atomic đơn giản nhất, chỉ có hai trạng thái: `set` và `clear`. Nó phải được khởi tạo với `ATOMIC_FLAG_INIT` và không thể sao chép hoặc gán. Các thao tác có thể thực hiện với `std::atomic_flag` là `clear()` xóa, `test_and_set()` đặt và truy vấn giá trị cũ, `destructor` hủy nó.
+
+Ví dụ gọi `clear()` để `std::atomic_flag` được xóa với memory-ordering là `release`, trong khi `test_and_set()` sử dụng memory-ordering mặc định là `seq_cst`.
+```cpp
+f.clear(std::memory_order_release);
+bool x = f.test_and_set();
+```
+
+Vì tính đơn giản và hạn chế, `std::atomic_flag` rất phù hợp để sử dụng làm spinlock mutex. Ví dụ:
+```cpp
+class spinlock_mutex
+{
+    std::atomic_flag flag;
+public:
+    spinlock_mutex(): flag(ATOMIC_FLAG_INIT) {}
+    void lock()
+    {
+      while (flag.test_and_set(std::memory_order_acquire));
+    }
+    void unlock()
+    {
+      flag.clear(std::memory_order_release);
+    }
+};
+```
+Spinlock mutex trên đủ để sử dụng với `std::lock_guard<spinlock_mutex>`. Tuy nhiên, nó thực hiện một busy-wait trong `lock()`, vì vậy đây không phải là lựa chọn tốt cho các tình huống có độ tranh chấp cao.
+
+| Tiêu chí       | Spinlock mutex                       | Mutex thông thường                     |
+| -------------- | ------------------------------------ | -------------------------------------- |
+| Cách thức chờ  | Vòng chờ (busy-wait)                 | Tạm dừng (blocked)                     |
+| Tài nguyên CPU | Tốn tài nguyên CPU nếu có tranh chấp | Không tốn tài nguyên CPU khi chờ       |
+| Hiệu quả       | Thích hợp cho tranh chấp ngắn hạn    | Thích hợp cho tranh chấp dài hạn       |
+| Phù hợp khi    | Khóa mutex trong thời gian ngắn      | Khóa mutex trong thời gian dài         |
+| Độ phức tạp    | Đơn giản                             | Phức tạp hơn (sử dụng cơ chế tạm dừng) |
+
+### 2.3. Thao tác với `std::atomic<bool>`
+
+`std::atomic<bool>` là một biến boolean hoàn chỉnh hơn so với `std::atomic_flag`. Mặc dù không thể khởi tạo sao chép (copy-constructible) hay gán sao chép (copy-assignable), bạn vẫn có thể khởi tạo nó từ một giá trị `bool` thông thường, và có thể gán giá trị cho đối tượng `std::atomic<bool>` từ một `bool` không phải atomic:
+```cpp
+std::atomic<bool> b(true);
+b = false;
+```
+
+Khi gán giá trị từ một `bool` không phải atomic, toán tử gán trả về giá trị `bool` đã được gán thay vì trả về một tham chiếu tới đối tượng (đọc kỹ hơn `operator=` của atomic [ở đây](https://en.cppreference.com/w/cpp/atomic/atomic/operator%3D)). Điều này giúp tránh phải tải lại giá trị từ bộ nhớ trong trường hợp có thay đổi từ các luồng khác.
+
+Việc đọc/ghi giá trị `true/false` cho `std::atomic<bool>` có thể được thực hiện bằng `load()` và `store()`, cũng như bạn có thể chỉ định các semantic bộ nhớ cho hành động đọc/ghi (ở đây "semantic bộ nhớ" và "memory-ordering" tương đương nhau đều ám chỉ các cách thức kiểm soát thứ tự thực thi và đồng bộ hóa bộ nhớ giữa các phép toán atomic). Ví dụ:
+
+```cpp
+std::atomic<bool> b;
+bool x = b.load(std::memory_order_acquire);
+b.store(true);
+x = b.exchange(false, std::memory_order_acq_rel);
+```
+
+Hàm `exchange()` là một thao tác read-modify-write (trả về giá trị hiện tại và ghi giá trị mới), nó thay thế cho `test_and_set()` trong `std::atomic_flag`.
+
+`std::atomic<bool>` cũng hỗ trợ thao tác so sánh và gán giá trị mới nếu giá trị hiện tại bằng một giá trị kỳ vọng. Thao tác này gọi là [`compare-exchange`](https://en.cppreference.com/w/cpp/atomic/atomic/compare_exchange), bao gồm các hàm `compare_exchange_weak()` và `compare_exchange_strong()`:
+- `compare_exchange_weak()` có thể không thành công dù giá trị ban đầu của `atomic` bằng giá trị kỳ vọng `expected`, điều này xảy ra khi có spurious failure (lỗi giả) do điều kiện hệ thống (ví dụ như chuyển luồng trong khi thực hiện thao tác). Do đó, cần sử dụng `compare_exchange_weak()` trong vòng lặp.
+- `compare_exchange_strong()` đảm bảo rằng nếu giá trị không khớp với giá trị kỳ vọng, nó sẽ trả về `false` và không gặp phải các lỗi giả như `compare_exchange_weak()`.
+
+Ví dụ `compare_exchange_weak()`:
+```cpp
+bool expected = false;
+extern atomic<bool> b; // b is set somewhere else
+while(!b.compare_exchange_weak(expected, true) && !expected);
+```
+- Chú ý: Hàm `compare_exchange_weak(expected, true)` có tham số thứ nhất `expected` được **pass by reference**. Nó so sánh giá trị hiện tại của `b` với `expected`:
+   + Nếu giá trị hiện tại của `b` khác với `expected` (tức là `b!=expected`), thì `expected` sẽ được cập nhật thành giá trị hiện tại của `b`. Ví dụ, nếu `b` đã là `true`, thì `expected` sẽ trở thành `true`.
+   + Nếu giá trị hiện tại của `b` bằng `expected` (tức là `b==expected`, ví dụ cả `b` và `expected` đều là `false`), thì `compare_exchange_weak()` sẽ cố gắng thay đổi giá trị của biến `b` từ `false` thành `true`.
+- Hàm `compare_exchange_weak()` sẽ trả về `true` nếu giá trị của `b` được thay đổi thành công, và trả về `false` nếu không thay đổi được giá trị.
+
+Các hàm `compare-exchange` có điểm đặc biệt là chúng có thể nhận hai tham số về memory-order khác nhau trong trường hợp thay đổi thành công và thất bại. Những hậu quả của việc lựa chọn memory ordering sẽ giải thích ở mục 5.3.
+
+Cuối cùng, `std::atomic<bool>` có hàm thành viên `is_lock_free()` để kiểm tra xem các hoạt động trên nó có lock-free hay không.
+
+### 2.4. Thao tác với atomic con trỏ `std::atomic<T*>`
+
+Thao tác với `std::atomic<T*>` tương tự như `std::atomic<bool>`. Nhưng lưu ý, thao tác với atomic con trỏ sẽ trả về giá trị kiểu con trỏ `T*` thay vì `bool`. Ngoài ra, `std::atomic<T*>` sẽ có các thao tác mới để hoạt động với con trỏ là `fetch_add()` và `fetch_sub()`, nó thực hiện cộng/trừ atomic trên địa chỉ của con trỏ.
+
+<!-- `std::atomic<T*>` cũng có sẵn các toán tử `+=`, `-=`, `++` và `--`. Các toán tử này hoạt động như sau: nếu có `std::atomic<Foo*> x;` trỏ đến phần tử đầu tiên của một mảng các đối tượng `Foo`, thì `x+=3` sẽ thay đổi nó để trỏ đến phần tử thứ tư và trả về một con trỏ kiểu `Foo*` trỏ đến phần tử thứ tư đó.
+
+fetch_add() và fetch_sub() hơi khác một chút vì chúng trả về giá trị ban đầu (do đó x.fetch_add(3) sẽ cập nhật x để trỏ đến giá trị thứ tư nhưng trả về một con trỏ đến giá trị đầu tiên trong mảng). Thao tác này còn được gọi là exchange-and-add, và đó là một phép toán read-modify-write nguyên tử, giống như exchange() và compare_exchange_weak()/compare_exchange_strong(). Giống như các phép toán khác, giá trị trả về là một giá trị con trỏ kiểu T* thay vì tham chiếu đến đối tượng std::atomic<T*>, vì vậy mã gọi có thể thực hiện các hành động dựa trên giá trị trước đó:
+
+```cpp
+class Foo{};
+Foo some_array[5];
+std::atomic<Foo*> p(some_array);
+Foo* x = p.fetch_add(2); // Cộng 2 vào p và trả về giá trị cũ
+assert(x == some_array);
+assert(p.load() == &some_array[2]);
+x = (p -= 1); // Trừ 1 từ p và trả về giá trị mới
+assert(x == &some_array[1]);
+assert(p.load() == &some_array[1]);
+```
+
+Các dạng hàm này cũng cho phép chỉ định các semantics về thứ tự bộ nhớ như một tham số hàm bổ sung:
+
+```cpp
+p.fetch_add(3, std::memory_order_release);
+```
+
+Vì cả fetch_add() và fetch_sub() đều là các phép toán read-modify-write, chúng có thể có bất kỳ thẻ thứ tự bộ nhớ nào và có thể tham gia vào một chuỗi release. Tuy nhiên, việc chỉ định thứ tự bộ nhớ không thể thực hiện cho các dạng toán tử, vì không có cách nào để cung cấp thông tin đó: do đó, các dạng toán tử này luôn có semantics memory_order_seq_cst.
+
+Các kiểu nguyên tử cơ bản còn lại đều giống nhau: tất cả chúng đều là các kiểu số nguyên tử và có cùng giao diện với nhau, ngoại trừ việc kiểu dữ liệu tích hợp đi kèm khác nhau. Chúng ta sẽ xem xét chúng như một nhóm. -->
 
 ## 3. Tài liệu tham khảo
 
