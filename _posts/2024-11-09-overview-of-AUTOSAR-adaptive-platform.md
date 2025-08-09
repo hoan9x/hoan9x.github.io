@@ -127,7 +127,7 @@ _Quy trình phát triển AP_
 
 Manifest là tài liệu cấu hình hoặc các mô tả cho AP, thông thường thì các tệp ARXML (AUTOSAR XML) được coi là manifest, nhưng lưu ý chỉ tệp ARXML cho AUTOSAR AP mới là manifest, vì tệp ARXML cũng được sử dụng trong AUTOSAR CP. Các manifest này được chia thành các loại khác nhau như:
 
-- Application Design: Mô tả các yếu tố thiết kế phần mềm ứng dụng cho AUTOSAR AP, bao gồm các loại dữ liệu, giao diện dịch vụ, lưu trữ dữ liệu bền vững, và các yêu cầu khác của ứng dụng. Nó giúp xác định cách thức triển khai ứng dụng trên AUTOSAR AP.
+- Application Design: Mô tả các yếu tố thiết kế phần mềm ứng dụng cho AUTOSAR AP, bao gồm các loại dữ liệu, giao diện dịch vụ, lưu trữ dữ liệu bền vững (lưu vào bộ nhớ không bay hơi), và các yêu cầu khác của ứng dụng. Nó giúp xác định cách thức triển khai ứng dụng trên AUTOSAR AP.
 - Execution Manifest: Mô tả thông tin về cách thức triển khai ứng dụng trên AUTOSAR AP, bao gồm các chi tiết về mã thực thi và cách mã này được tích hợp vào machine. Nó đảm bảo rằng ứng dụng sẽ được triển khai đúng cách trên nền tảng.
 - Service Instance Manifest: Mô tả cách giao tiếp dịch vụ được cấu hình cho ứng dụng như giao thức truyền thông. Nó xác định cách thức các dịch vụ sẽ được triển khai và truy cập từ ứng dụng, đặc biệt là các giao tiếp giữa các ứng dụng sử dụng giao thức dịch vụ nào.
 - Machine Manifest: Mô tả cấu hình và các thông tin liên quan đến machine đang chạy AUTOSAR AP. Nó xác định phần mềm và cấu hình cần thiết để thiết lập một machine AUTOSAR AP.

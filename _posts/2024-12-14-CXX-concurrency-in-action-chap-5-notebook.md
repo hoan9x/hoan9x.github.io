@@ -302,41 +302,50 @@ while(!b.compare_exchange_weak(expected, true) && !expected);
    + Nếu giá trị hiện tại của `b` bằng `expected` (tức là `b==expected`, ví dụ cả `b` và `expected` đều là `false`), thì `compare_exchange_weak()` sẽ cố gắng thay đổi giá trị của biến `b` từ `false` thành `true`.
 - Hàm `compare_exchange_weak()` sẽ trả về `true` nếu giá trị của `b` được thay đổi thành công, và trả về `false` nếu không thay đổi được giá trị.
 
-Các hàm `compare-exchange` có điểm đặc biệt là chúng có thể nhận hai tham số về memory-order khác nhau trong trường hợp thay đổi thành công và thất bại. Những hậu quả của việc lựa chọn memory ordering sẽ giải thích ở mục 5.3.
+Các hàm `compare-exchange` có điểm đặc biệt là chúng có thể nhận hai tham số về memory-order khác nhau trong trường hợp thay đổi thành công và thất bại. Những hậu quả của việc lựa chọn memory ordering sẽ giải thích ở các mục tiếp theo.
+<!-- TODO: Cần link tới mục giải thích memory ordering -->
 
 Cuối cùng, `std::atomic<bool>` có hàm thành viên `is_lock_free()` để kiểm tra xem các hoạt động trên nó có lock-free hay không.
 
 ### 2.4. Thao tác với atomic con trỏ `std::atomic<T*>`
 
-Thao tác với `std::atomic<T*>` tương tự như `std::atomic<bool>`. Nhưng lưu ý, thao tác với atomic con trỏ sẽ trả về giá trị kiểu con trỏ `T*` thay vì `bool`. Ngoài ra, `std::atomic<T*>` sẽ có các thao tác mới để hoạt động với con trỏ là `fetch_add()` và `fetch_sub()`, nó thực hiện cộng/trừ atomic trên địa chỉ của con trỏ.
+Thao tác với `std::atomic<T*>` tương tự như với `std::atomic<bool>`, tuy nhiên có một điểm cần lưu ý: khi thao tác với atomic con trỏ, giá trị trả về sẽ có kiểu con trỏ `T*` thay vì kiểu `bool`. Bên cạnh đó, `std::atomic<T*>` cung cấp một số thao tác mới, bao gồm `fetch_add()` và `fetch_sub()`, dùng để thực hiện các phép toán cộng/trừ nguyên tử trên địa chỉ của con trỏ.
 
-<!-- `std::atomic<T*>` cũng có sẵn các toán tử `+=`, `-=`, `++` và `--`. Các toán tử này hoạt động như sau: nếu có `std::atomic<Foo*> x;` trỏ đến phần tử đầu tiên của một mảng các đối tượng `Foo`, thì `x+=3` sẽ thay đổi nó để trỏ đến phần tử thứ tư và trả về một con trỏ kiểu `Foo*` trỏ đến phần tử thứ tư đó.
+Ngoài ra, `std::atomic<T*>` còn hỗ trợ các toán tử `+=`, `-=` và các toán tử tăng/giảm (`++` và `--`). Các toán tử này hoạt động như sau: giả sử có một biến atomic con trỏ `x` (`std::atomic<Foo*> x`) trỏ đến phần tử đầu tiên của một mảng các đối tượng `Foo`, khi thực hiện `x+=3`, giá trị của `x` sẽ thay đổi để trỏ đến phần tử thứ 4 của mảng, đồng thời trả về một con trỏ kiểu `Foo*` trỏ đến phần tử thứ 4 đó.
 
-fetch_add() và fetch_sub() hơi khác một chút vì chúng trả về giá trị ban đầu (do đó x.fetch_add(3) sẽ cập nhật x để trỏ đến giá trị thứ tư nhưng trả về một con trỏ đến giá trị đầu tiên trong mảng). Thao tác này còn được gọi là exchange-and-add, và đó là một phép toán read-modify-write nguyên tử, giống như exchange() và compare_exchange_weak()/compare_exchange_strong(). Giống như các phép toán khác, giá trị trả về là một giá trị con trỏ kiểu T* thay vì tham chiếu đến đối tượng std::atomic<T*>, vì vậy mã gọi có thể thực hiện các hành động dựa trên giá trị trước đó:
+Đối với `fetch_add()` và `fetch_sub()`, chúng hoạt động hơi khác một chút. Ví dụ, `x.fetch_add(3)` sẽ làm thay đổi `x` để trỏ đến phần tử thứ 4 trong mảng, nhưng khác biệt là nó sẽ trả về con trỏ trỏ đến phần tử đầu tiên của mảng trước khi thực hiện phép toán. Thao tác này được gọi là `exchange-and-add`, và là một phép toán nguyên tử kiểu read-modify-write, tương tự như các hàm `exchange()` và `compare_exchange_weak/strong()`.
 
 ```cpp
 class Foo{};
 Foo some_array[5];
 std::atomic<Foo*> p(some_array);
-Foo* x = p.fetch_add(2); // Cộng 2 vào p và trả về giá trị cũ
+Foo* x = p.fetch_add(2); // Add 2 to p and return x as the old value
 assert(x == some_array);
 assert(p.load() == &some_array[2]);
-x = (p -= 1); // Trừ 1 từ p và trả về giá trị mới
+x = (p -= 1); // Subtract 1 from p and return x as the new value
 assert(x == &some_array[1]);
 assert(p.load() == &some_array[1]);
 ```
 
-Các dạng hàm này cũng cho phép chỉ định các semantics về thứ tự bộ nhớ như một tham số hàm bổ sung:
+Các hàm `fetch_add()` và `fetch_sub()` còn cho phép chỉ định semantic bộ nhớ, trong khi các thao tác toán tử như `+=` lại luôn sử dụng `memory_order_seq_cst` (vì không thể chỉ định semantic bộ nhớ cho toán tử). Ví dụ:
 
 ```cpp
 p.fetch_add(3, std::memory_order_release);
 ```
 
-Vì cả fetch_add() và fetch_sub() đều là các phép toán read-modify-write, chúng có thể có bất kỳ thẻ thứ tự bộ nhớ nào và có thể tham gia vào một chuỗi release. Tuy nhiên, việc chỉ định thứ tự bộ nhớ không thể thực hiện cho các dạng toán tử, vì không có cách nào để cung cấp thông tin đó: do đó, các dạng toán tử này luôn có semantics memory_order_seq_cst.
+### 2.5. Thao tác với atomic số nguyên (integral types)
 
-Các kiểu nguyên tử cơ bản còn lại đều giống nhau: tất cả chúng đều là các kiểu số nguyên tử và có cùng giao diện với nhau, ngoại trừ việc kiểu dữ liệu tích hợp đi kèm khác nhau. Chúng ta sẽ xem xét chúng như một nhóm. -->
+Ngoài các thao tác quen thuộc như `load()`, `store()`, `exchange()`, `compare_exchange_weak/strong()`, các kiểu atomic số nguyên như `std::atomic<int>` hoặc `std::atomic<long>` còn hỗ trợ nhiều thao tác khác như `fetch_add()`, `fetch_sub()`, `fetch_and()`,... và các toán tử như `+=`, `-=`, `&=`, `|=`, `++`... Bạn có thể tham khảo chi tiết các thao tác [tại đây](https://en.cppreference.com/w/cpp/atomic/atomic#Specialized_for_integral_types_only).
 
-## 3. Tài liệu tham khảo
+Các thao tác với atomic số nguyên gần như đầy đủ tương tự như thao tác với kiểu số nguyên thông thường, tuy nhiên vẫn thiếu một số phép toán như nhân `*`, chia `/`, và dịch bit `<<`, `>>`. Cuối cùng, semantic bộ nhớ của các thao tác với atomic số nguyên tương tự như `fetch_add()` và `fetch_sub()` đối với `std::atomic<T*>`.
+
+### 2.6. Thao tác với atomic tự định nghĩa
+
+### 2.7. Hàm free cho các thao tác atomic
+
+## 3. Thao tác đồng bộ hóa và điều khiển thứ tự thực thi
+
+## 4. Tài liệu tham khảo
 
 - [1] Anthony Williams, "5. The C++ memory model and operations on atomic types" in *C++ Concurrency in Action*, 2nd Edition, 2019.
 

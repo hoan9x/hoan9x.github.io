@@ -7,6 +7,9 @@ categories: [Linux, GNU Debugger]
 mermaid: true
 ---
 
+> This article is not complete yet.
+{: .prompt-warning }
+
 ## 1. What is GDB?
 
 GDB (GNU Debugger) is a debugging tool used to analyze and debug programs written in languages like C, C++, etc. It allows developers to see what happens inside their programs while they are running or what the program was doing at the moment it crashed. GDB is commonly used in the Linux/UNIX environment.
@@ -61,9 +64,6 @@ Reading symbols from ./simple_debug.app...
 
 - [1] Paul Deitel and Harvey Deitel, "Using the GNU C++ Debugger" in *C++ How to Program*, 8th Edition, 2012.
 - [2] Udemy Course. (2020). *Learn Linux User Space Debugging* [Online]. Available: [link](https://www.udemy.com/course/learn-linux-user-space-debugging/)
-
-> This article is not complete yet.
-{: .prompt-warning }
 
 [//]: # (----------SCOPE OF DECLARATION OF LIST OF IMAGES USED IN POST----------)
 [img_1]: /assets/img/2024-10-Linux-user-space-debugging/01_start_stop_gdb.gif "Start/Stop GDB"

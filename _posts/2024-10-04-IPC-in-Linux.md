@@ -7,6 +7,9 @@ categories: [Linux, IPC]
 mermaid: true
 ---
 
+> This article is not complete yet.
+{: .prompt-warning }
+
 ## 1. What is IPC?
 
 IPC (Inter Process Communication) is a mechanism through which two or more processes running on the same machine exchange data with each other.
@@ -159,6 +162,3 @@ However, two important aspects must be ensured:
 [//]: # (----------SCOPE OF DECLARATION OF LIST OF IMAGES USED IN POST----------)
 [img_1]: /assets/img/2024-10-IPC-in-Linux/01_computer_layer_architecture.png "Computer Layer Architecture"
 [img_1d]: /assets/img/2024-10-IPC-in-Linux/01d_computer_layer_architecture.png "Computer Layer Architecture"
-
-> This article is not complete yet.
-{: .prompt-warning }
